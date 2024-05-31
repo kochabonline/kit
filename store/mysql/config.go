@@ -2,8 +2,7 @@ package mysql
 
 import (
 	"fmt"
-
-	"github.com/kochabonline/kit/reflect"
+	"github.com/kochabonline/kit/core/reflect"
 )
 
 type Config struct {

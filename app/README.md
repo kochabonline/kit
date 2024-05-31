@@ -1,6 +1,4 @@
-# Kit
-
-### Quick Start
+# Quick Start
 
 ```go
 import (

@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
+
+	"github.com/kochabonline/kit/core/reflect"
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/reflect"
-	"github.com/spf13/viper"
 )
 
 type Interface interface {

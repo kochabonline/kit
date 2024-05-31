@@ -1,6 +1,8 @@
 package mysql
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestMysql(t *testing.T) {
 	m, err := New(&Config{})

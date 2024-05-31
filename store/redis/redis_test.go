@@ -3,7 +3,7 @@ package redis
 import "testing"
 
 func TestSingle(t *testing.T) {
-	r, err := New(&Config{
+	r, err := NewClient(&Config{
 		Password: "12345678",
 	})
 	if err != nil {
@@ -16,7 +16,7 @@ func TestSingle(t *testing.T) {
 }
 
 func TestCluster(t *testing.T) {
-	r, err := NewCluster(&ClusterConfig{
+	r, err := NewClusterClient(&ClusterConfig{
 		Addrs: []string{":6379", ":6380", ":6381"},
 	})
 	if err != nil {

@@ -7,6 +7,7 @@ install: ## Install dependencies
 	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@go install github.com/favadi/protoc-go-inject-tag@latest
 	@go install github.com/google/wire/cmd/wire@latest
+	@go install github.com/swaggo/swag/cmd/swag@latest
 
 proto: ## Generate gRPC code
 	@protoc -I=. -I=../.. --go_out=. --go_opt=module=${PKG} --go-grpc_out=. --go-grpc_opt=module=${PKG} */*.proto
@@ -15,6 +16,9 @@ proto: ## Generate gRPC code
 
 wire: ## Generate wire code
 	@wire ./...
+
+swag: ## Generate swagger docs
+	@swag init
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

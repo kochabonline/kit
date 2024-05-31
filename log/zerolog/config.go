@@ -1,6 +1,8 @@
 package zerolog
 
-import "github.com/kochabonline/kit/reflect"
+import (
+	"github.com/kochabonline/kit/core/reflect"
+)
 
 type Mode int
 

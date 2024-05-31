@@ -9,10 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/log/zerolog"
 	"github.com/kochabonline/kit/transport"
-	"golang.org/x/sync/errgroup"
 )
 
 type App struct {

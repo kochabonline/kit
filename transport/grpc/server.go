@@ -40,6 +40,10 @@ func NewServer(addr string, opts ...Option) *Server {
 }
 
 func (s *Server) Run() error {
+	if s.server == nil {
+		return grpc.ErrServerStopped
+	}
+
 	if ok := transport.ValidateAddress(s.addr); !ok {
 		s.log.Warnf("invalid address %s, using default address: %s", s.addr, defaultAddr)
 		s.addr = defaultAddr
@@ -55,6 +59,10 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.server == nil {
+		return grpc.ErrServerStopped
+	}
+
 	s.server.GracefulStop()
 	return nil
 }

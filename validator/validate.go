@@ -11,6 +11,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	enTrans "github.com/go-playground/validator/v10/translations/en"
 	zhTrans "github.com/go-playground/validator/v10/translations/zh"
+
 	"github.com/kochabonline/kit/log"
 )
 

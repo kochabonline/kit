@@ -21,6 +21,18 @@ func NewResponse(code int, reason string, data any) *Response {
 	}
 }
 
+func JSON(ctx any, data any) {
+	if c, ok := ctx.(*gin.Context); ok {
+		GinJSON(c, data)
+	}
+}
+
+func JSONError(ctx any, err error) {
+	if c, ok := ctx.(*gin.Context); ok {
+		GinJSONError(c, err)
+	}
+}
+
 func GinJSON(c *gin.Context, data any) {
 	c.JSON(http.StatusOK, NewResponse(http.StatusOK, "", data))
 }

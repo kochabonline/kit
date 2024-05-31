@@ -83,7 +83,7 @@ func NewGoogleAuthenticator(Opt ...Options) GoogleAuthenticatorer {
 // GenerateSecret generates a new secret
 func (ga *GoogleAuthenticator) GenerateSecret() string {
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.BigEndian, time.Now().UnixNano())
+	_ = binary.Write(&buf, binary.BigEndian, time.Now().UnixNano())
 	return strings.ToUpper(ga.base32encode(ga.hmacSha1(buf.Bytes(), nil)))
 }
 

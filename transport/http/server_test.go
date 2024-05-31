@@ -5,20 +5,34 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestServerRun(t *testing.T) {
-	s := NewServer("", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	// import "./docs"
+	// docs.SwaggerInfo.Title = "Swagger Example API"
+	// docs.SwaggerInfo.Description = "This is a sample server Petstore server."
+	// docs.SwaggerInfo.Version = "1.0"
+	// docs.SwaggerInfo.Host = "petstore.swagger.io"
+	// docs.SwaggerInfo.BasePath = "/v2"
+	// docs.SwaggerInfo.Schemes = []string{"http", "https"}
+
+	gin.SetMode(gin.ReleaseMode)
+	s := NewServer(
+		"",
+		gin.New(),
+		WithSwagOptions(SwagOptions{Enabled: true}),
+		WithMetricsOptions(MetricsOptions{Enabled: true}),
+		WithHealthOptions(HealthOptions{Enabled: true}),
+	)
 
 	go func() {
 		err := s.Run()
 		assert.NoError(t, err)
 	}()
 
-	time.Sleep(time.Second) // give server time to start
+	time.Sleep(30 * time.Second) // give server time to start
 
 	resp, err := http.Get("http://localhost:8080")
 	assert.NoError(t, err)
