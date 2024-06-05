@@ -44,12 +44,13 @@ func (l *Log) GinLogger() gin.HandlerFunc {
 			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		l.logger.Info([]any{"http request", params}...)
+		l.logger.Info(params...)
 	}
 }
 
 func (l *Log) parseParams(c *gin.Context, cost string) []any {
 	return []any{
+		"htttp_request",
 		"method", c.Request.Method,
 		"uri", c.Request.RequestURI,
 		"cost", cost,
