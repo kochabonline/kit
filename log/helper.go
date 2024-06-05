@@ -7,6 +7,8 @@ import (
 	"github.com/kochabonline/kit/log/level"
 )
 
+const defaultMsgKey = "msg"
+
 type Helper struct {
 	logger  Logger
 	msgKey  string
@@ -37,7 +39,7 @@ func WithSprintf(sprintf func(string, ...any) string) HelperOption {
 func NewHelper(logger Logger, opts ...HelperOption) *Helper {
 	h := &Helper{
 		logger: logger,
-		msgKey: "msg",
+		msgKey: defaultMsgKey,
 	}
 
 	for _, opt := range opts {
