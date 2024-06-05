@@ -7,7 +7,7 @@ import (
 func callerSkipFrameCount() int {
 	// Ask runtime.Callers for up to 10 pcs, including runtime.Callers itself.
 	pc := make([]uintptr, 10)
-	n := runtime.Callers(3, pc)
+	n := runtime.Callers(2, pc)
 	if n == 0 {
 		return 0
 	}

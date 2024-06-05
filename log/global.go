@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/kochabonline/kit/log/level"
-	"github.com/kochabonline/kit/log/zerolog"
+	"github.com/kochabonline/kit/log/slog"
 )
 
 var global = new(glogger)
@@ -17,7 +17,7 @@ type glogger struct {
 }
 
 func init() {
-	global.SetLogger(zerolog.New())
+	global.SetLogger(slog.New())
 }
 
 func SetDefaultLogger(logger Logger) {
