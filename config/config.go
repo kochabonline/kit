@@ -18,10 +18,10 @@ type Interface interface {
 }
 
 type Config struct {
-	Option Option `json:"option"`
+	Options Options `json:"option"`
 }
 
-type Option struct {
+type Options struct {
 	// Provider is the type of configuration provider.
 	Provider Provider
 	// Path is the path to the configuration file.
@@ -34,9 +34,9 @@ type Option struct {
 
 type ConfigOption func(*Config)
 
-func NewConfig(cf Option, opts ...ConfigOption) *Config {
+func NewConfig(cfgOptions Options, opts ...ConfigOption) *Config {
 	c := &Config{
-		Option: cf,
+		Options: cfgOptions,
 	}
 	_ = c.initConfig()
 
@@ -50,18 +50,18 @@ func NewConfig(cf Option, opts ...ConfigOption) *Config {
 }
 
 func (c *Config) initConfig() error {
-	return reflect.SetDefaultTag(c.Option.Target)
+	return reflect.SetDefaultTag(c.Options.Target)
 }
 
 func (c *Config) viper() {
-	if c.Option.Path == "" {
-		c.Option.Path = "."
+	if c.Options.Path == "" {
+		c.Options.Path = "."
 	}
-	extension := path.Ext(c.Option.Name)
+	extension := path.Ext(c.Options.Name)
 	configType := strings.TrimPrefix(extension, ".")
 
-	viper.AddConfigPath(c.Option.Path)
-	viper.SetConfigName(c.Option.Name)
+	viper.AddConfigPath(c.Options.Path)
+	viper.SetConfigName(c.Options.Name)
 	viper.SetConfigType(configType)
 	viper.AutomaticEnv()
 	replacer := strings.NewReplacer(".", "_")
@@ -73,7 +73,7 @@ func (c *Config) Read() error {
 		return errors.Internal("config read error", err.Error())
 	}
 
-	if err := viper.Unmarshal(&c.Option.Target); err != nil {
+	if err := viper.Unmarshal(&c.Options.Target); err != nil {
 		return errors.Internal("config unmarshal error", err.Error())
 	}
 

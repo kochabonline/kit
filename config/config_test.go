@@ -14,7 +14,7 @@ type mock struct {
 
 func TestConfig(t *testing.T) {
 	cfg := new(mock)
-	c := NewConfig(Option{
+	c := NewConfig(Options{
 		Provider: ProviderFile,
 		Target:   cfg,
 	})
