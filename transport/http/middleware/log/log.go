@@ -44,7 +44,7 @@ func (l *Log) GinLogger() gin.HandlerFunc {
 			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		l.logger.Info("http request", params)
+		l.logger.Info([]any{"http request", params}...)
 	}
 }
 
