@@ -39,6 +39,10 @@ func NewServer(addr string, opts ...Option) *Server {
 	return s
 }
 
+func (s *Server) SetLogger(logger *log.Helper) {
+	s.log = logger
+}
+
 func (s *Server) Run() error {
 	if s.server == nil {
 		return grpc.ErrServerStopped

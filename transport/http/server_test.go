@@ -22,9 +22,9 @@ func TestServerRun(t *testing.T) {
 	s := NewServer(
 		"",
 		gin.New(),
-		WithSwagOptions(SwagOptions{Enabled: true}),
-		WithMetricsOptions(MetricsOptions{Enabled: true}),
-		WithHealthOptions(HealthOptions{Enabled: true}),
+		WithSwagOptions(SwagOption{Enabled: true}),
+		WithMetricsOptions(MetricsOption{Enabled: true}),
+		WithHealthOptions(HealthOption{Enabled: true}),
 	)
 
 	go func() {

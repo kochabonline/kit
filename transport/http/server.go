@@ -36,21 +36,21 @@ func WithLogger(logger *log.Helper) Option {
 	}
 }
 
-func WithMetricsOptions(metrics MetricsOptions) Option {
+func WithMetricsOptions(metrics MetricsOption) Option {
 	return func(s *Server) {
 		_ = metrics.init()
 		s.options.Metrics = metrics
 	}
 }
 
-func WithSwagOptions(swag SwagOptions) Option {
+func WithSwagOptions(swag SwagOption) Option {
 	return func(s *Server) {
 		_ = swag.init()
 		s.options.Swag = swag
 	}
 }
 
-func WithHealthOptions(health HealthOptions) Option {
+func WithHealthOptions(health HealthOption) Option {
 	return func(s *Server) {
 		_ = health.init()
 		s.options.Health = health
@@ -78,6 +78,10 @@ func NewServer(addr string, handler http.Handler, opts ...Option) *Server {
 	}
 
 	return s
+}
+
+func (s *Server) SetLogger(logger *log.Helper) {
+	s.log = logger
 }
 
 func (s *Server) Run() error {

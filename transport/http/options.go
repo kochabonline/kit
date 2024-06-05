@@ -3,34 +3,34 @@ package http
 import "github.com/kochabonline/kit/core/reflect"
 
 type Options struct {
-	Swag    SwagOptions
-	Metrics MetricsOptions
-	Health  HealthOptions
+	Swag    SwagOption
+	Metrics MetricsOption
+	Health  HealthOption
 }
 
-type SwagOptions struct {
+type SwagOption struct {
 	Enabled bool   `json:"enabled"`
 	Path    string `json:"path" default:"/swagger/*any"`
 }
 
-func (s *SwagOptions) init() error {
+func (s *SwagOption) init() error {
 	return reflect.SetDefaultTag(s)
 }
 
-type MetricsOptions struct {
+type MetricsOption struct {
 	Enabled bool   `json:"enabled"`
 	Path    string `json:"path" default:"/metrics"`
 }
 
-func (m *MetricsOptions) init() error {
+func (m *MetricsOption) init() error {
 	return reflect.SetDefaultTag(m)
 }
 
-type HealthOptions struct {
+type HealthOption struct {
 	Enabled bool   `json:"enabled"`
 	Path    string `json:"path" default:"/health"`
 }
 
-func (h *HealthOptions) init() error {
+func (h *HealthOption) init() error {
 	return reflect.SetDefaultTag(h)
 }
