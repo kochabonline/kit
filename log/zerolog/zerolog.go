@@ -16,9 +16,10 @@ const (
 )
 
 type Logger struct {
-	logger zerolog.Logger
-	caller bool
-	once   bool
+	logger               zerolog.Logger
+	caller               bool
+	callerSkipFrameCount int
+	once                 bool
 }
 
 type Option func(*Logger)
@@ -26,6 +27,13 @@ type Option func(*Logger)
 func WithCaller() Option {
 	return func(z *Logger) {
 		z.caller = true
+	}
+}
+
+func WithCallerSkipFrameCount(count int) Option {
+	return func(z *Logger) {
+		z.caller = true
+		z.callerSkipFrameCount = count
 	}
 }
 
@@ -92,7 +100,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 func (z *Logger) Log(l level.Level, args ...any) {
 	if z.caller && !z.once {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount()).Logger()
+		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount() + z.callerSkipFrameCount).Logger()
 		z.once = true
 	}
 	var event *zerolog.Event
