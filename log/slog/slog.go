@@ -11,9 +11,17 @@ import (
 
 type Slog struct {
 	logger *slog.Logger
+	caller bool
 }
 
 type Option func(*Slog)
+
+func WithCaller() Option {
+	return func(s *Slog) {
+		s.caller = true
+		s.logger = s.logger.With("caller", caller(callerSkipFrameCount()))
+	}
+}
 
 func New(opts ...Option) *Slog {
 	s := &Slog{
@@ -30,15 +38,15 @@ func New(opts ...Option) *Slog {
 func (s *Slog) log(l level.Level, msg string, args ...any) {
 	switch l {
 	case level.Debug:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Debug(msg, args...)
+		s.logger.Debug(msg, args...)
 	case level.Info:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Info(msg, args...)
+		s.logger.Info(msg, args...)
 	case level.Warn:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Warn(msg, args...)
+		s.logger.Warn(msg, args...)
 	case level.Error:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Error(msg, args...)
+		s.logger.Error(msg, args...)
 	case level.Fatal:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Log(context.Background(), slog.Level(level.Fatal), msg, args...)
+		s.logger.Log(context.Background(), slog.Level(level.Fatal), msg, args...)
 	}
 }
 
@@ -49,7 +57,7 @@ func (s *Slog) Log(l level.Level, args ...any) {
 
 	msg, ok := args[0].(string)
 	if !ok {
-		s.logger.With("caller", caller(callerSkipFrameCount())).Error("invalid log message, first argument must be a string")
+		s.logger.Error("invalid log message, first argument must be a string")
 		return
 	}
 	args = args[1:]

@@ -21,7 +21,7 @@ func (m *mock) String() string {
 
 func TestLog(t *testing.T) {
 	m := mock{Name: "test"}
-	h := NewHelper(zerolog.New())
+	h := NewHelper(zerolog.New(zerolog.WithCaller()))
 	h.Debug("test message", "key", "value")
 	h.Debug("test message", "mock", m)
 	h.Info("test message", "key", "value")

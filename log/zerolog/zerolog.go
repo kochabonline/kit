@@ -17,10 +17,17 @@ const (
 
 type Logger struct {
 	logger zerolog.Logger
+	caller bool
 	once   bool
 }
 
 type Option func(*Logger)
+
+func WithCaller() Option {
+	return func(z *Logger) {
+		z.caller = true
+	}
+}
 
 func init() {
 	zerolog.TimeFieldFormat = time.DateTime
@@ -84,7 +91,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 }
 
 func (z *Logger) Log(l level.Level, args ...any) {
-	if !z.once {
+	if z.caller && !z.once {
 		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount()).Logger()
 		z.once = true
 	}

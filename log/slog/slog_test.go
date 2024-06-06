@@ -18,7 +18,7 @@ func (m mock) String() string {
 }
 
 func TestSlog(t *testing.T) {
-	logger := New()
+	logger := New(WithCaller())
 
 	logger.Log(level.Debug, "debug message", "user", mock{Name: "John", Age: 30})
 	logger.Log(level.Info, "info message")
