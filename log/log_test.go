@@ -21,12 +21,12 @@ func (m *mock) String() string {
 
 func TestLog(t *testing.T) {
 	m := mock{Name: "test"}
-	h := NewHelper(zerolog.New(4))
+	h := NewHelper(zerolog.New())
 	h.Debug("test message", "key", "value")
 	h.Debug("test message", "mock", m)
 	h.Info("test message", "key", "value")
-	f := NewHelper(NewFilter(zerolog.New(5), WithFilterKey("password")))
+	f := NewHelper(NewFilter(zerolog.New(), WithFilterKey("password")))
 	f.Info("test message", "password", "12345", "user", "alex")
-	SetDefaultLogger(zerolog.New(4))
+	SetDefaultLogger(zerolog.New())
 	Error("test message", "error", errors.New("error message").Error())
 }

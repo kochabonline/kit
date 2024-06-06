@@ -16,10 +16,10 @@ func caller(depth int) string {
 	return file[idx+1:] + ":" + strconv.Itoa(line)
 }
 
-func callerSkipFrameCount(count int) int {
+func callerSkipFrameCount() int {
 	// Ask runtime.Callers for up to 10 pcs, including runtime.Callers itself.
 	pc := make([]uintptr, 10)
-	n := runtime.Callers(count, pc)
+	n := runtime.Callers(3, pc)
 	if n == 0 {
 		return 0
 	}

@@ -17,7 +17,7 @@ type glogger struct {
 }
 
 func init() {
-	global.SetLogger(zerolog.New(zerolog.DefaultSkipFrameCount))
+	global.SetLogger(zerolog.New())
 }
 
 func SetDefaultLogger(logger Logger) {

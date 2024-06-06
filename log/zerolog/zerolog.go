@@ -13,22 +13,14 @@ import (
 
 const (
 	defaultMsgKey = "msg"
-	DefaultSkipFrameCount = 3
 )
 
 type Logger struct {
-	logger                   zerolog.Logger
-	callerWithSkipFrameCount int
-	once                     bool
+	logger zerolog.Logger
+	once   bool
 }
 
 type Option func(*Logger)
-
-func WithCallerSkipFrameCount(skipFrameCount int) Option {
-	return func(z *Logger) {
-		z.callerWithSkipFrameCount = skipFrameCount
-	}
-}
 
 func init() {
 	zerolog.TimeFieldFormat = time.DateTime
@@ -48,10 +40,9 @@ func consoleWriter() zerolog.ConsoleWriter {
 	return output
 }
 
-func New(skipFrameCount int, opts ...Option) *Logger {
+func New(opts ...Option) *Logger {
 	z := &Logger{
-		callerWithSkipFrameCount: 2,
-		logger:                   zerolog.New(consoleWriter()).With().CallerWithSkipFrameCount(skipFrameCount).Timestamp().Logger(),
+		logger: zerolog.New(consoleWriter()).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -66,8 +57,7 @@ func NewFile(c Config, opts ...Option) *Logger {
 	writer := rotate(c)
 
 	z := &Logger{
-		callerWithSkipFrameCount: 2,
-		logger:                   zerolog.New(writer).With().Timestamp().Logger(),
+		logger: zerolog.New(writer).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -83,8 +73,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 	multi := zerolog.MultiLevelWriter(writer, consoleWriter())
 
 	z := &Logger{
-		callerWithSkipFrameCount: 2,
-		logger:                   zerolog.New(multi).With().Timestamp().Logger(),
+		logger: zerolog.New(multi).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -95,10 +84,10 @@ func NewMulti(c Config, opts ...Option) *Logger {
 }
 
 func (z *Logger) Log(l level.Level, args ...any) {
-	// if !z.once {
-	// 	z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount(z.callerWithSkipFrameCount)).Logger()
-	// 	z.once = true
-	// }
+	if !z.once {
+		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount()).Logger()
+		z.once = true
+	}
 	var event *zerolog.Event
 
 	length := len(args)
