@@ -77,7 +77,9 @@ func (s *Store) Init() error {
 			}
 			objects = append(objects, obj.ioc.Name())
 		}
-		s.log.Infof("[ioc] | namespace: %s | objects: %v", ns.name, objects)
+		if len(objects) > 0 {
+			s.log.Infof("[ioc] | namespace: %s | objects: %v", ns.name, objects)
+		}
 	}
 
 	return nil
@@ -120,6 +122,8 @@ func (s *Store) GinIRouterRegister(r gin.IRouter) {
 			}
 			routers = append(routers, obj.ioc.Name())
 		}
-		s.log.Infof("[gin] | namespace: %s | routers: %v", ns.name, routers)
+		if len(routers) > 0 {
+			s.log.Infof("[gin] | namespace: %s | routers: %v", ns.name, routers)
+		}
 	}
 }
