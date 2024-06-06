@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 )
 
 var (
@@ -32,7 +31,7 @@ func WithLogger(logger *log.Helper) Option {
 
 func NewRecovery(opts ...Option) *Recovery {
 	r := &Recovery{
-		logger: log.NewHelper(zerolog.New()),
+		logger: log.DefaultLogger,
 	}
 
 	for _, opt := range opts {

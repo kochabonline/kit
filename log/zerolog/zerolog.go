@@ -11,7 +11,10 @@ import (
 	"github.com/rs/zerolog/pkgerrors"
 )
 
-const defaultMsgKey = "msg"
+const (
+	defaultMsgKey = "msg"
+	DefaultSkipFrameCount = 3
+)
 
 type Logger struct {
 	logger                   zerolog.Logger
@@ -45,10 +48,10 @@ func consoleWriter() zerolog.ConsoleWriter {
 	return output
 }
 
-func New(opts ...Option) *Logger {
+func New(skipFrameCount int, opts ...Option) *Logger {
 	z := &Logger{
 		callerWithSkipFrameCount: 2,
-		logger:                   zerolog.New(consoleWriter()).With().Timestamp().Logger(),
+		logger:                   zerolog.New(consoleWriter()).With().CallerWithSkipFrameCount(skipFrameCount).Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -92,11 +95,10 @@ func NewMulti(c Config, opts ...Option) *Logger {
 }
 
 func (z *Logger) Log(l level.Level, args ...any) {
-	if !z.once {
-		fmt.Println("callerWithSkipFrameCount", callerSkipFrameCount(z.callerWithSkipFrameCount))
-		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount(z.callerWithSkipFrameCount)).Logger()
-		z.once = true
-	}
+	// if !z.once {
+	// 	z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount(z.callerWithSkipFrameCount)).Logger()
+	// 	z.once = true
+	// }
 	var event *zerolog.Event
 
 	length := len(args)

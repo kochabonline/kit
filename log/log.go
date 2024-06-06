@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	DefaultLogger = NewHelper(zerolog.New())
+	DefaultLogger = NewHelper(zerolog.New(zerolog.DefaultSkipFrameCount))
 )
 
 type Logger interface {

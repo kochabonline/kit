@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 )
 
 type Log struct {
@@ -22,7 +21,7 @@ func WithLogger(logger *log.Helper) Option {
 
 func NewLog(opts ...Option) *Log {
 	l := &Log{
-		logger: log.NewHelper(zerolog.New()),
+		logger: log.DefaultLogger,
 	}
 
 	for _, opt := range opts {

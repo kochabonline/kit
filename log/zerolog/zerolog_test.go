@@ -7,6 +7,6 @@ import (
 )
 
 func TestLogger(t *testing.T) {
-	z := New()
+	z := New(DefaultSkipFrameCount)
 	z.Log(level.Debug, "hello world")
 }
