@@ -100,7 +100,11 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 func (z *Logger) Log(l level.Level, args ...any) {
 	if z.caller && !z.once {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount() + z.callerSkipFrameCount).Logger()
+		if z.callerSkipFrameCount != 0 {
+			z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
+		} else {
+			z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount()).Logger()
+		}
 		z.once = true
 	}
 	var event *zerolog.Event

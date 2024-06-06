@@ -11,15 +11,19 @@ import (
 
 type Slog struct {
 	logger *slog.Logger
-	caller bool
 }
 
 type Option func(*Slog)
 
 func WithCaller() Option {
 	return func(s *Slog) {
-		s.caller = true
 		s.logger = s.logger.With("caller", caller(callerSkipFrameCount()))
+	}
+}
+
+func WithCallerSkipFrameCount(count int) Option {
+	return func(s *Slog) {
+		s.logger = s.logger.With("caller", caller(count))
 	}
 }
 
