@@ -14,10 +14,9 @@ import (
 const defaultMsgKey = "msg"
 
 type Logger struct {
-	logger                      zerolog.Logger
-	callerWithSkipFrameCount    int
-	addCallerWithSkipFrameCount int
-	once                        bool
+	logger                   zerolog.Logger
+	callerWithSkipFrameCount int
+	once                     bool
 }
 
 type Option func(*Logger)
@@ -25,12 +24,6 @@ type Option func(*Logger)
 func WithCallerSkipFrameCount(skipFrameCount int) Option {
 	return func(z *Logger) {
 		z.callerWithSkipFrameCount = skipFrameCount
-	}
-}
-
-func WithAddCallerSkipFrameCount(skipFrameCount int) Option {
-	return func(z *Logger) {
-		z.addCallerWithSkipFrameCount = skipFrameCount
 	}
 }
 
@@ -54,7 +47,8 @@ func consoleWriter() zerolog.ConsoleWriter {
 
 func New(opts ...Option) *Logger {
 	z := &Logger{
-		logger: zerolog.New(consoleWriter()).With().Timestamp().Logger(),
+		callerWithSkipFrameCount: 2,
+		logger:                   zerolog.New(consoleWriter()).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -69,7 +63,8 @@ func NewFile(c Config, opts ...Option) *Logger {
 	writer := rotate(c)
 
 	z := &Logger{
-		logger: zerolog.New(writer).With().Timestamp().Logger(),
+		callerWithSkipFrameCount: 2,
+		logger:                   zerolog.New(writer).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -85,7 +80,8 @@ func NewMulti(c Config, opts ...Option) *Logger {
 	multi := zerolog.MultiLevelWriter(writer, consoleWriter())
 
 	z := &Logger{
-		logger: zerolog.New(multi).With().Timestamp().Logger(),
+		callerWithSkipFrameCount: 2,
+		logger:                   zerolog.New(multi).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
@@ -97,17 +93,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 func (z *Logger) Log(l level.Level, args ...any) {
 	if !z.once {
-		var callerWithSkipFrameCount int
-		switch {
-		case z.callerWithSkipFrameCount != 0:
-			callerWithSkipFrameCount = z.callerWithSkipFrameCount
-		case z.addCallerWithSkipFrameCount != 0:
-			callerWithSkipFrameCount = callerSkipFrameCount() + z.addCallerWithSkipFrameCount
-		default:
-			callerWithSkipFrameCount = callerSkipFrameCount()
-		}
-
-		z.logger = z.logger.With().CallerWithSkipFrameCount(callerWithSkipFrameCount).Logger()
+		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount(z.callerWithSkipFrameCount)).Logger()
 		z.once = true
 	}
 	var event *zerolog.Event

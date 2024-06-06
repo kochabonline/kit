@@ -10,9 +10,8 @@ import (
 )
 
 type Slog struct {
-	callerWithSkipFrameCount    int
-	addCallerWithSkipFrameCount int
-	logger                      *slog.Logger
+	callerWithSkipFrameCount int
+	logger                   *slog.Logger
 }
 
 type Option func(*Slog)
@@ -23,15 +22,10 @@ func WithCallerSkipFrameCount(skipFrameCount int) Option {
 	}
 }
 
-func WithAddCallerSkipFrameCount(skipFrameCount int) Option {
-	return func(s *Slog) {
-		s.addCallerWithSkipFrameCount = skipFrameCount
-	}
-}
-
 func New(opts ...Option) *Slog {
 	s := &Slog{
-		logger: slog.New(slog.NewTextHandler(os.Stdout, HandlerOptions())),
+		callerWithSkipFrameCount: 3,
+		logger:                   slog.New(slog.NewTextHandler(os.Stdout, HandlerOptions())),
 	}
 
 	for _, opt := range opts {
@@ -42,27 +36,17 @@ func New(opts ...Option) *Slog {
 }
 
 func (s *Slog) log(l level.Level, msg string, args ...any) {
-	var callerWithSkipFrameCount int
-	switch {
-	case s.callerWithSkipFrameCount != 0:
-		callerWithSkipFrameCount = s.callerWithSkipFrameCount
-	case s.addCallerWithSkipFrameCount != 0:
-		callerWithSkipFrameCount = callerSkipFrameCount() + s.addCallerWithSkipFrameCount
-	default:
-		callerWithSkipFrameCount = callerSkipFrameCount()
-	}
-
 	switch l {
 	case level.Debug:
-		s.logger.With("caller", caller(callerWithSkipFrameCount)).Debug(msg, args...)
+		s.logger.With("caller", caller(callerSkipFrameCount(s.callerWithSkipFrameCount))).Debug(msg, args...)
 	case level.Info:
-		s.logger.With("caller", caller(callerWithSkipFrameCount)).Info(msg, args...)
+		s.logger.With("caller", caller(callerSkipFrameCount(s.callerWithSkipFrameCount))).Info(msg, args...)
 	case level.Warn:
-		s.logger.With("caller", caller(callerWithSkipFrameCount)).Warn(msg, args...)
+		s.logger.With("caller", caller(callerSkipFrameCount(s.callerWithSkipFrameCount))).Warn(msg, args...)
 	case level.Error:
-		s.logger.With("caller", caller(callerWithSkipFrameCount)).Error(msg, args...)
+		s.logger.With("caller", caller(callerSkipFrameCount(s.callerWithSkipFrameCount))).Error(msg, args...)
 	case level.Fatal:
-		s.logger.With("caller", caller(callerWithSkipFrameCount)).Log(context.Background(), slog.Level(level.Fatal), msg, args...)
+		s.logger.With("caller", caller(callerSkipFrameCount(s.callerWithSkipFrameCount))).Log(context.Background(), slog.Level(level.Fatal), msg, args...)
 	}
 }
 
@@ -73,7 +57,7 @@ func (s *Slog) Log(l level.Level, args ...any) {
 
 	msg, ok := args[0].(string)
 	if !ok {
-		s.logger.With("caller", caller(callerSkipFrameCount())).Error("invalid log message, first argument must be a string")
+		s.logger.With("caller", caller(callerSkipFrameCount(callerSkipFrameCount(s.callerWithSkipFrameCount)))).Error("invalid log message, first argument must be a string")
 		return
 	}
 	args = args[1:]

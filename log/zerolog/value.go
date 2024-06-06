@@ -4,10 +4,10 @@ import (
 	"runtime"
 )
 
-func callerSkipFrameCount() int {
+func callerSkipFrameCount(count int) int {
 	// Ask runtime.Callers for up to 10 pcs, including runtime.Callers itself.
 	pc := make([]uintptr, 10)
-	n := runtime.Callers(2, pc)
+	n := runtime.Callers(count, pc)
 	if n == 0 {
 		return 0
 	}
