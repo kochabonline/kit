@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 	"github.com/kochabonline/kit/transport"
 )
 
@@ -26,10 +25,16 @@ type Server struct {
 
 type Option func(*Server)
 
+func WithLogger(logger *log.Helper) Option {
+	return func(s *Server) {
+		s.log = logger
+	}
+}
+
 func NewServer(addr string, opts ...Option) *Server {
 	s := &Server{
 		server: grpc.NewServer(),
-		log:    log.NewHelper(zerolog.New()),
+		log:    log.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -37,10 +42,6 @@ func NewServer(addr string, opts ...Option) *Server {
 	}
 
 	return s
-}
-
-func (s *Server) SetLogger(logger *log.Helper) {
-	s.log = logger
 }
 
 func (s *Server) Run() error {

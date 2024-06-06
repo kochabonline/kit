@@ -10,7 +10,6 @@ import (
 	"github.com/swaggo/gin-swagger"
 
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 	"github.com/kochabonline/kit/transport"
 	"github.com/kochabonline/kit/transport/http/metrics/prometheus"
 )
@@ -63,7 +62,7 @@ func NewServer(addr string, handler http.Handler, opts ...Option) *Server {
 			Addr:    addr,
 			Handler: handler,
 		},
-		log: log.NewHelper(zerolog.New()),
+		log: log.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -78,10 +77,6 @@ func NewServer(addr string, handler http.Handler, opts ...Option) *Server {
 	}
 
 	return s
-}
-
-func (s *Server) SetLogger(logger *log.Helper) {
-	s.log = logger
 }
 
 func (s *Server) Run() error {

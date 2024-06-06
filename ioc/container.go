@@ -2,7 +2,6 @@ package ioc
 
 import (
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 )
 
 const (
@@ -22,5 +21,5 @@ var Container = &Store{
 }
 
 func init() {
-	Container.SetLogger(log.NewHelper(zerolog.New()))
+	Container.SetLogger(log.DefaultLogger)
 }

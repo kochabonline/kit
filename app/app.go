@@ -12,7 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 	"github.com/kochabonline/kit/transport"
 )
 
@@ -62,7 +61,7 @@ func NewApp(servers []transport.Server, opts ...Option) *App {
 		ctx:             context.Background(),
 		sigs:            []os.Signal{os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT},
 		shutdownTimeout: 30 * time.Second,
-		logger:          log.NewHelper(zerolog.New()),
+		logger:          log.DefaultLogger,
 	}
 
 	for _, opt := range opts {

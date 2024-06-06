@@ -14,11 +14,25 @@ import (
 const defaultMsgKey = "msg"
 
 type Logger struct {
-	logger zerolog.Logger
-	once   bool
+	logger                      zerolog.Logger
+	callerWithSkipFrameCount    int
+	addCallerWithSkipFrameCount int
+	once                        bool
 }
 
 type Option func(*Logger)
+
+func WithCallerSkipFrameCount(skipFrameCount int) Option {
+	return func(z *Logger) {
+		z.callerWithSkipFrameCount = skipFrameCount
+	}
+}
+
+func WithAddCallerSkipFrameCount(skipFrameCount int) Option {
+	return func(z *Logger) {
+		z.addCallerWithSkipFrameCount = skipFrameCount
+	}
+}
 
 func init() {
 	zerolog.TimeFieldFormat = time.DateTime
@@ -83,7 +97,17 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 func (z *Logger) Log(l level.Level, args ...any) {
 	if !z.once {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount()).Logger()
+		var callerWithSkipFrameCount int
+		switch {
+		case z.callerWithSkipFrameCount != 0:
+			callerWithSkipFrameCount = z.callerWithSkipFrameCount
+		case z.addCallerWithSkipFrameCount != 0:
+			callerWithSkipFrameCount = callerSkipFrameCount() + z.addCallerWithSkipFrameCount
+		default:
+			callerWithSkipFrameCount = callerSkipFrameCount()
+		}
+
+		z.logger = z.logger.With().CallerWithSkipFrameCount(callerWithSkipFrameCount).Logger()
 		z.once = true
 	}
 	var event *zerolog.Event

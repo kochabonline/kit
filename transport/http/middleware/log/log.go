@@ -50,7 +50,7 @@ func (l *Log) GinLogger() gin.HandlerFunc {
 
 func (l *Log) parseParams(c *gin.Context, cost string) []any {
 	return []any{
-		"htttp_request",
+		"http request",
 		"method", c.Request.Method,
 		"uri", c.Request.RequestURI,
 		"cost", cost,

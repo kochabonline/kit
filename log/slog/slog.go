@@ -10,10 +10,24 @@ import (
 )
 
 type Slog struct {
-	logger *slog.Logger
+	callerWithSkipFrameCount    int
+	addCallerWithSkipFrameCount int
+	logger                      *slog.Logger
 }
 
 type Option func(*Slog)
+
+func WithCallerSkipFrameCount(skipFrameCount int) Option {
+	return func(s *Slog) {
+		s.callerWithSkipFrameCount = skipFrameCount
+	}
+}
+
+func WithAddCallerSkipFrameCount(skipFrameCount int) Option {
+	return func(s *Slog) {
+		s.addCallerWithSkipFrameCount = skipFrameCount
+	}
+}
 
 func New(opts ...Option) *Slog {
 	s := &Slog{
@@ -28,17 +42,27 @@ func New(opts ...Option) *Slog {
 }
 
 func (s *Slog) log(l level.Level, msg string, args ...any) {
+	var callerWithSkipFrameCount int
+	switch {
+	case s.callerWithSkipFrameCount != 0:
+		callerWithSkipFrameCount = s.callerWithSkipFrameCount
+	case s.addCallerWithSkipFrameCount != 0:
+		callerWithSkipFrameCount = callerSkipFrameCount() + s.addCallerWithSkipFrameCount
+	default:
+		callerWithSkipFrameCount = callerSkipFrameCount()
+	}
+
 	switch l {
 	case level.Debug:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Debug(msg, args...)
+		s.logger.With("caller", caller(callerWithSkipFrameCount)).Debug(msg, args...)
 	case level.Info:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Info(msg, args...)
+		s.logger.With("caller", caller(callerWithSkipFrameCount)).Info(msg, args...)
 	case level.Warn:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Warn(msg, args...)
+		s.logger.With("caller", caller(callerWithSkipFrameCount)).Warn(msg, args...)
 	case level.Error:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Error(msg, args...)
+		s.logger.With("caller", caller(callerWithSkipFrameCount)).Error(msg, args...)
 	case level.Fatal:
-		s.logger.With("caller", caller(callerSkipFrameCount())).Log(context.Background(), slog.Level(level.Fatal), msg, args...)
+		s.logger.With("caller", caller(callerWithSkipFrameCount)).Log(context.Background(), slog.Level(level.Fatal), msg, args...)
 	}
 }
 
