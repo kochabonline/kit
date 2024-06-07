@@ -17,7 +17,7 @@ type glogger struct {
 }
 
 func init() {
-	global.SetLogger(zerolog.New())
+	global.SetLogger(zerolog.New(zerolog.WithCaller()))
 }
 
 func SetDefaultLogger(logger Logger) {
