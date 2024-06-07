@@ -52,6 +52,7 @@ func (r *Recovery) GinRecovery(stack bool) gin.HandlerFunc {
 
 				if brokenPipe {
 					r.logger.Error(
+						"recover from broken pipe",
 						"request", string(httpRequest),
 						"errors", err,
 					)
@@ -63,12 +64,14 @@ func (r *Recovery) GinRecovery(stack bool) gin.HandlerFunc {
 
 				if stack {
 					r.logger.Error(
+						"recover from panic",
 						"request", string(httpRequest),
 						"errors", err,
 						"stack", string(debug.Stack()),
 					)
 				} else {
 					r.logger.Error(
+						"recover from panic",
 						"request", string(httpRequest),
 						"errors", err,
 					)
