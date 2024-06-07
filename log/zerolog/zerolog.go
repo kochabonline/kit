@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	defaultMsgKey               = "msg"
-	defaultCallerSkipFrameCount = 5
+	defaultMsgKey                     = "msg"
+	defaultHelperCallerSkipFrameCount = 4
+	defaultFilterCallerSkipFrameCount = 5
+	defaultCallerSkipFrameCount       = 5
 )
 
 type Logger struct {
@@ -25,11 +27,24 @@ type Logger struct {
 
 type Option func(*Logger)
 
-// WithCaller enables the caller field in the log output.
 func WithCaller() Option {
 	return func(z *Logger) {
 		z.caller = true
 		z.callerSkipFrameCount = defaultCallerSkipFrameCount
+	}
+}
+
+func WithHelperCaller() Option {
+	return func(z *Logger) {
+		z.caller = true
+		z.callerSkipFrameCount = defaultHelperCallerSkipFrameCount
+	}
+}
+
+func WithFilterCaller() Option {
+	return func(z *Logger) {
+		z.caller = true
+		z.callerSkipFrameCount = defaultFilterCallerSkipFrameCount
 	}
 }
 
