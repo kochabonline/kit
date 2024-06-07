@@ -100,6 +100,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 func (z *Logger) Log(l level.Level, args ...any) {
 	if z.caller && !z.once {
+		fmt.Println("callerSkipFrameCount: ", callerSkipFrameCount())
 		if z.callerSkipFrameCount != 0 {
 			z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
 		} else {
