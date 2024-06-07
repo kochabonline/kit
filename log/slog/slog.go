@@ -9,6 +9,10 @@ import (
 	"github.com/kochabonline/kit/log/level"
 )
 
+const (
+	defaultCallerSkipFrameCount = 3
+)
+
 type Slog struct {
 	logger *slog.Logger
 }
@@ -17,7 +21,7 @@ type Option func(*Slog)
 
 func WithCaller() Option {
 	return func(s *Slog) {
-		s.logger = s.logger.With("caller", caller(callerSkipFrameCount()))
+		s.logger = s.logger.With("caller", caller(defaultCallerSkipFrameCount))
 	}
 }
 

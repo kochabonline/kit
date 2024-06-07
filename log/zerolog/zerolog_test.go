@@ -7,6 +7,6 @@ import (
 )
 
 func TestLogger(t *testing.T) {
-	z := New(WithCaller())
+	z := New()
 	z.Log(level.Debug, "hello world")
 }

@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	defaultMsgKey = "msg"
+	defaultMsgKey               = "msg"
+	defaultCallerSkipFrameCount = 5
 )
 
 type Logger struct {
@@ -24,9 +25,11 @@ type Logger struct {
 
 type Option func(*Logger)
 
+// WithCaller enables the caller field in the log output.
 func WithCaller() Option {
 	return func(z *Logger) {
 		z.caller = true
+		z.callerSkipFrameCount = defaultCallerSkipFrameCount
 	}
 }
 
@@ -100,12 +103,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 func (z *Logger) Log(l level.Level, args ...any) {
 	if z.caller && !z.once {
-		fmt.Println("callerSkipFrameCount: ", callerSkipFrameCount())
-		if z.callerSkipFrameCount != 0 {
-			z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
-		} else {
-			z.logger = z.logger.With().CallerWithSkipFrameCount(callerSkipFrameCount()).Logger()
-		}
+		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
 		z.once = true
 	}
 	var event *zerolog.Event
