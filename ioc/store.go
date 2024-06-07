@@ -94,13 +94,18 @@ func (s *Store) RegisterNamespace(name string, priority int) {
 	s.log.Infof("[register] | namespace: %s | priority: %d", name, priority)
 }
 
-func (s *Store) Register(nsname string, ioc Ioc, priority int) {
+func (s *Store) Register(nsname string, ioc Ioc, priority ...int) {
 	if _, ok := s.namespaces[nsname]; !ok {
 		s.log.Errorf("namespace %s not found", nsname)
 		return
 	}
 
-	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: priority}
+	p := 0
+	if len(priority) > 0 {
+		p = priority[0]
+	}
+
+	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: p}
 }
 
 func (s *Store) Get(nsname string, name string) Ioc {
