@@ -19,6 +19,7 @@ type Interface interface {
 
 type Config struct {
 	Option Option `json:"option"`
+	log    *log.Helper
 }
 
 type Option struct {
@@ -37,6 +38,7 @@ type ConfigOption func(*Config)
 func NewConfig(cf Option, opts ...ConfigOption) *Config {
 	c := &Config{
 		Option: cf,
+		log:    log.DefaultLogger,
 	}
 	_ = c.initConfig()
 
@@ -84,7 +86,7 @@ func (c *Config) Watch() error {
 	ch := make(chan error, 1)
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Infof("Config file changed: %s", e.Name)
+		c.log.Infof("Config file changed: %s", e.Name)
 		if err := c.Read(); err != nil {
 			ch <- err
 		}

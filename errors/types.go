@@ -20,6 +20,10 @@ func MethodNotAllowed(reason, format string, args ...any) *Error {
 	return New(405, reason, format, args...)
 }
 
+func RequestTimeout(reason, format string, args ...any) *Error {
+	return New(408, reason, format, args...)
+}
+
 func TooManyRequests(reason, format string, args ...any) *Error {
 	return New(429, reason, format, args...)
 }
