@@ -16,6 +16,7 @@ import (
 type DingTalk struct {
 	Webhook string `json:"webhook"`
 	Secret  string `json:"secret"`
+	client  *http.Client
 	log     *log.Helper
 }
 
@@ -27,12 +28,23 @@ func WithLogger(logger *log.Helper) Option {
 	}
 }
 
-func New(webhook string, secret string) *DingTalk {
-	return &DingTalk{
+func WithClient(client *http.Client) Option {
+	return func(d *DingTalk) {
+		d.client = client
+	}
+}
+
+func New(webhook string, secret string, opts ...Option) *DingTalk {
+	d := &DingTalk{
 		Webhook: webhook,
 		Secret:  secret,
+		client:  http.DefaultClient,
 		log:     log.NewHelper(log.DefaultLogger),
 	}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 func (d *DingTalk) sign() (string, string) {
@@ -68,8 +80,7 @@ func (d *DingTalk) Send(message Message) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := d.client.Do(req)
 	if err != nil {
 		d.log.Error("failed to send message", "error", err, "body", message)
 		return err

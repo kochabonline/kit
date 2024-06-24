@@ -1,4 +1,4 @@
-package recovery
+package middleware
 
 import (
 	"net"
@@ -12,37 +12,24 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
-var (
-	lastError      string
-	lastErrorLower string
-)
-
-type Recovery struct {
-	logger *log.Helper
+type GinRecoveryConfig struct {
+	Logger *log.Helper
+	Stack  bool
 }
 
-type Option func(*Recovery)
-
-func WithLogger(logger *log.Helper) Option {
-	return func(r *Recovery) {
-		r.logger = logger
-	}
+func GinRecovery() gin.HandlerFunc {
+	return GinRecoveryWithConfig(GinRecoveryConfig{
+		Stack: true,
+	})
 }
 
-func NewRecovery(opts ...Option) *Recovery {
-	r := &Recovery{
-		logger: log.DefaultLogger,
-	}
-
-	for _, opt := range opts {
-		opt(r)
-	}
-
-	return r
-}
-
-func (r *Recovery) GinRecovery(stack bool) gin.HandlerFunc {
+func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		logger := config.Logger
+		if logger == nil {
+			logger = log.DefaultLogger
+		}
+
 		defer func() {
 			if err := recover(); err != nil {
 				httpRequest, _ := httputil.DumpRequest(c.Request, false)
@@ -51,7 +38,7 @@ func (r *Recovery) GinRecovery(stack bool) gin.HandlerFunc {
 				brokenPipe := isBrokenPipe(err)
 
 				if brokenPipe {
-					r.logger.Error(
+					logger.Error(
 						"recover from broken pipe",
 						"request", string(httpRequest),
 						"errors", err,
@@ -62,15 +49,15 @@ func (r *Recovery) GinRecovery(stack bool) gin.HandlerFunc {
 					return
 				}
 
-				if stack {
-					r.logger.Error(
+				if config.Stack {
+					logger.Error(
 						"recover from panic",
 						"request", string(httpRequest),
 						"errors", err,
 						"stack", string(debug.Stack()),
 					)
 				} else {
-					r.logger.Error(
+					logger.Error(
 						"recover from panic",
 						"request", string(httpRequest),
 						"errors", err,
@@ -86,15 +73,8 @@ func (r *Recovery) GinRecovery(stack bool) gin.HandlerFunc {
 func isBrokenPipe(err any) bool {
 	if ne, ok := err.(*net.OpError); ok {
 		if se, ok := ne.Err.(*os.SyscallError); ok {
-			errStr := se.Error()
-			if errStr != lastError {
-				lastError = errStr
-				lastErrorLower = strings.ToLower(lastError)
-			}
-			if strings.Contains(lastError, "broken pipe") || strings.Contains(lastError, "connection reset by peer") ||
-				strings.Contains(lastErrorLower, "broken pipe") || strings.Contains(lastErrorLower, "connection reset by peer") {
-				return true
-			}
+			errStr := strings.ToLower(se.Error())
+			return strings.Contains(errStr, "broken pipe") || strings.Contains(errStr, "connection reset by peer")
 		}
 	}
 	return false
