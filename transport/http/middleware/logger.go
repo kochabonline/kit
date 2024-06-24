@@ -7,9 +7,7 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
-type GinLoggerConfig struct {
-	Logger *log.Helper
-}
+type GinLoggerConfig struct{}
 
 func GinLogger() gin.HandlerFunc {
 	return GinLoggerWithConfig(GinLoggerConfig{})
@@ -17,11 +15,6 @@ func GinLogger() gin.HandlerFunc {
 
 func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		logger := config.Logger
-		if logger == nil {
-			logger = log.DefaultLogger
-		}
-
 		start := time.Now()
 		c.Next()
 		cost := time.Since(start)
@@ -40,6 +33,6 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		logger.Info(params...)
+		log.Info(params...)
 	}
 }

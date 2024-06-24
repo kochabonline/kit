@@ -13,8 +13,7 @@ import (
 )
 
 type GinRecoveryConfig struct {
-	Logger *log.Helper
-	Stack  bool
+	Stack bool
 }
 
 func GinRecovery() gin.HandlerFunc {
@@ -25,11 +24,6 @@ func GinRecovery() gin.HandlerFunc {
 
 func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		logger := config.Logger
-		if logger == nil {
-			logger = log.DefaultLogger
-		}
-
 		defer func() {
 			if err := recover(); err != nil {
 				httpRequest, _ := httputil.DumpRequest(c.Request, false)
@@ -38,7 +32,7 @@ func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
 				brokenPipe := isBrokenPipe(err)
 
 				if brokenPipe {
-					logger.Error(
+					log.Error(
 						"recover from broken pipe",
 						"request", string(httpRequest),
 						"errors", err,
@@ -50,14 +44,14 @@ func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
 				}
 
 				if config.Stack {
-					logger.Error(
+					log.Error(
 						"recover from panic",
 						"request", string(httpRequest),
 						"errors", err,
 						"stack", string(debug.Stack()),
 					)
 				} else {
-					logger.Error(
+					log.Error(
 						"recover from panic",
 						"request", string(httpRequest),
 						"errors", err,
