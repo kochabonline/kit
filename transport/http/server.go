@@ -103,7 +103,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 func handleMetrics(s *Server, r *gin.Engine) {
 	if s.options.Metrics.Enabled {
-		r.GET(s.options.Metrics.Path, gin.WrapH(promhttp.HandlerFor(prometheus.Registry, promhttp.HandlerOpts{
+		prom := prometheus.NewPrometheus(prometheus.Config{
+			Path:               s.options.Metrics.Path,
+			EnabledGoCollector: true,
+		})
+
+		r.GET(prom.Config.Path, gin.WrapH(promhttp.HandlerFor(prom.Registry, promhttp.HandlerOpts{
 			EnableOpenMetrics: true,
 		})))
 	}
