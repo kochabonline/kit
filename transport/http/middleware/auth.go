@@ -41,6 +41,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
+		log.Info("auth success")
 		c.Next()
 	}
 }
