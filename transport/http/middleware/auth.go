@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
@@ -11,7 +13,7 @@ var ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware faile
 
 type AuthConfig struct {
 	AuthHeader string
-	ParseAuth  func(c *gin.Context) (string, error)
+	ParseAuth  func(ctx context.Context) (string, error)
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
@@ -28,7 +30,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		auth, err := config.ParseAuth(c)
+		auth, err := config.ParseAuth(c.Request.Context())
 		if err != nil {
 			log.Error("failed to parse auth", "error", err)
 			response.GinJSONError(c, ErrUnauthorized)
@@ -41,7 +43,6 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		log.Info("auth success")
 		c.Next()
 	}
 }
