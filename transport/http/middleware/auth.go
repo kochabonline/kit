@@ -25,7 +25,6 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		if authHeader == "" {
 			log.Errorf("missing auth header %s", config.AuthHeader)
 			response.GinJSONError(c, ErrUnauthorized)
-			c.Abort()
 			return
 		}
 
@@ -33,14 +32,12 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		if err != nil {
 			log.Error("failed to parse auth", "error", err)
 			response.GinJSONError(c, ErrUnauthorized)
-			c.Abort()
 			return
 		}
 
 		if authHeader != auth {
 			log.Error("unauthorized", "authHeader", authHeader, "auth", auth)
 			response.GinJSONError(c, ErrUnauthorized)
-			c.Abort()
 			return
 		}
 
