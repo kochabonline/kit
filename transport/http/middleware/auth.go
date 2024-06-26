@@ -13,7 +13,7 @@ var ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware faile
 
 type AuthConfig struct {
 	AuthHeader string
-	ParseAuth  func(ctx context.Context) (string, error)
+	ParseAuth  func(ctx context.Context, authHeader string) (string, error)
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
@@ -30,7 +30,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		auth, err := config.ParseAuth(c.Request.Context())
+		auth, err := config.ParseAuth(c.Request.Context(), authHeader)
 		if err != nil {
 			log.Error("failed to parse auth", "error", err)
 			response.GinJSONError(c, ErrUnauthorized)
