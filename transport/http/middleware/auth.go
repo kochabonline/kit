@@ -10,13 +10,15 @@ import (
 var ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
 
 type AuthConfig struct {
+	// AuthHeader is the header key to look for the auth value
 	AuthHeader string
-	ParseAuth  func(c *gin.Context) (string, error)
+	// Validate is a function that takes a gin context and returns the auth value
+	Validate func(c *gin.Context) (string, error)
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if config.ParseAuth == nil {
+		if config.Validate == nil {
 			c.Next()
 			return
 		}
@@ -28,9 +30,9 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		auth, err := config.ParseAuth(c)
+		auth, err := config.Validate(c)
 		if err != nil {
-			log.Error("failed to parse auth", "error", err)
+			log.Errorf("auth validation failed: %v", err)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
