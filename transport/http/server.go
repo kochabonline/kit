@@ -21,7 +21,13 @@ const (
 	defaultAddr = ":8080"
 )
 
+// Meta is the metadata of the server.
+type Meta struct {
+	Name string
+}
+
 type Server struct {
+	Meta
 	server  *http.Server
 	log     *log.Helper
 	options Options
@@ -83,12 +89,15 @@ func (s *Server) Run() error {
 	if s.server == nil {
 		return http.ErrServerClosed
 	}
+	if s.Name == "" {
+		s.Name = "http"
+	}
 
 	if ok := transport.ValidateAddress(s.server.Addr); !ok {
 		s.log.Warnf("invalid address %s, using default address: %s", s.server.Addr, defaultAddr)
 		s.server.Addr = defaultAddr
 	}
-	s.log.Infof("http server listening on %s", s.server.Addr)
+	s.log.Infof("%s server listening on %s", s.Name, s.server.Addr)
 
 	return s.server.ListenAndServe()
 }
