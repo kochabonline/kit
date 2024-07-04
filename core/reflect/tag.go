@@ -29,9 +29,12 @@ func SetDefaultTag(obj any) error {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		tag := field.Tag.Get("default")
+		if tag == "" {
+			continue
+		}
 
 		value := v.Field(i)
-		if value.IsZero() && tag != "" {
+		if value.IsZero() {
 			switch value.Kind() {
 			case reflect.String:
 				value.SetString(tag)
