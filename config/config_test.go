@@ -2,7 +2,6 @@ package config
 
 import (
 	"testing"
-	"time"
 )
 
 type mock struct {
@@ -27,6 +26,5 @@ func TestConfig(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(10 * time.Second)
 	t.Log(cfg)
 }

@@ -40,7 +40,11 @@ func NewConfig(cf Option, opts ...ConfigOption) *Config {
 		Option: cf,
 		log:    log.DefaultLogger,
 	}
-	_ = c.initConfig()
+
+	err := c.initConfig()
+	if err != nil {
+		c.log.Fatalf("default tag error: %s", err.Error())
+	}
 
 	for _, opt := range opts {
 		opt(c)
