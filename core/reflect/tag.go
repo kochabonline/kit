@@ -31,7 +31,7 @@ func SetDefaultTag(obj any) error {
 		tag := field.Tag.Get("default")
 
 		value := v.Field(i)
-		if value.IsZero() {
+		if value.IsZero() && tag != "" {
 			switch value.Kind() {
 			case reflect.String:
 				value.SetString(tag)

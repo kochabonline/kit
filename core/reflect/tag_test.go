@@ -10,6 +10,7 @@ func TestTag(t *testing.T) {
 			Basketball string `default:"basketball"`
 			Football string `default:"football"`
 		}
+		Enabled bool `json:"enabled"`
 	}
 
 	mock := Mock{ Age: 20 }
