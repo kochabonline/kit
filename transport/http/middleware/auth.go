@@ -14,10 +14,16 @@ type AuthConfig struct {
 	AuthHeader string
 	// Validate is a function that takes a gin context and returns the auth value
 	Validate func(c *gin.Context) (string, error)
+	// SkippedPathPrefixes is a list of path prefixes that should be skipped from auth
+	SkippedPathPrefixes []string
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if skippedPathPrefixes(c, config.SkippedPathPrefixes) {
+			c.Next()
+			return
+		}
 		if config.Validate == nil {
 			c.Next()
 			return
