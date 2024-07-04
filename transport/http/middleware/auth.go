@@ -20,7 +20,7 @@ type AuthConfig struct {
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if skippedPathPrefixes(c, config.SkippedPathPrefixes) {
+		if skippedPathPrefixes(c, config.SkippedPathPrefixes...) {
 			c.Next()
 			return
 		}
