@@ -4,16 +4,16 @@ import "testing"
 
 func TestTag(t *testing.T) {
 	type Mock struct {
-		Name string `default:"John"`
-		Age  int    `default:"18"`
+		Name  string `default:"John"`
+		Age   int    `default:"18"`
 		Hobby struct {
 			Basketball string `default:"basketball"`
-			Football string `default:"football"`
+			Football   string `default:"football"`
 		}
-		Enabled bool `json:"enabled"`
+		Enabled bool `json:"enabled" default:"true"`
 	}
 
-	mock := Mock{ Age: 20 }
+	mock := Mock{Age: 20}
 
 	if err := SetDefaultTag(&mock); err != nil {
 		t.Fatal(err)
