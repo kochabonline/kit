@@ -21,7 +21,7 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 
 		params := make([]any, 0, 10)
 		params = append(params,
-			"http request",
+			"",
 			"method", c.Request.Method,
 			"uri", c.Request.RequestURI,
 			"cost", cost.String(),

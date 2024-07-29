@@ -20,31 +20,31 @@ type AuthConfig struct {
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if skippedPathPrefixes(c, config.SkippedPathPrefixes...) {
+		if config.Validate == nil {
 			c.Next()
 			return
 		}
-		if config.Validate == nil {
+		if skippedPathPrefixes(c, config.SkippedPathPrefixes...) {
 			c.Next()
 			return
 		}
 
 		authHeader := c.GetHeader(config.AuthHeader)
 		if authHeader == "" {
-			log.Errorf("missing auth header %s", config.AuthHeader)
+			log.Error("unauthorized", "authHeader", authHeader, "request", c.Request)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
 
 		auth, err := config.Validate(c)
 		if err != nil {
-			log.Errorf("auth validation failed: %v", err)
+			log.Error("unauthorized", "authHeader", authHeader, "request", c.Request, "error", err)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
 
 		if authHeader != auth {
-			log.Error("unauthorized", "authHeader", authHeader, "auth", auth)
+			log.Error("unauthorized", "authHeader", authHeader, "auth", auth, "request", c.Request)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
