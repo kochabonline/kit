@@ -75,20 +75,20 @@ func (a *App) Run() error {
 	eg, ctx := errgroup.WithContext(a.ctx)
 	wg := sync.WaitGroup{}
 
-	for _, s := range a.servers {
-		s := s
+	for _, server := range a.servers {
+		server := server
 		eg.Go(func() error {
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), a.shutdownTimeout)
 			defer cancel()
 
-			return s.Shutdown(shutdownCtx)
+			return server.Shutdown(shutdownCtx)
 		})
 
 		wg.Add(1)
 		eg.Go(func() error {
 			wg.Done()
-			return s.Run()
+			return server.Run()
 		})
 	}
 

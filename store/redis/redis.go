@@ -3,22 +3,29 @@ package redis
 import (
 	"context"
 	"runtime"
+	"sync"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type Single struct {
 	Client *redis.Client
+	once   sync.Once
 }
 
 type Cluster struct {
 	Client *redis.ClusterClient
+	once   sync.Once
 }
 
 type SingleOption func(*Single)
 
-func NewClient(c *Config, opts ...SingleOption) (*redis.Client, error) {
-	_ = c.initConfig()
+func NewClient(c *Config, opts ...SingleOption) (*Single, error) {
+	err := c.initConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Single{}
 
 	for _, opt := range opts {
@@ -28,35 +35,37 @@ func NewClient(c *Config, opts ...SingleOption) (*redis.Client, error) {
 	return s.newClient(c)
 }
 
-func (s *Single) newClient(c *Config) (*redis.Client, error) {
+func (s *Single) newClient(c *Config) (*Single, error) {
 	if c.PoolSize == 0 {
 		c.PoolSize = 10 * runtime.GOMAXPROCS(0)
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     c.Addr(),
-		Password: c.Password,
-		DB:       c.DB,
-		Protocol: c.Protocol,
-		PoolSize: c.PoolSize,
+	s.once.Do(func() {
+		s.Client = redis.NewClient(&redis.Options{
+			Addr:     c.Addr(),
+			Password: c.Password,
+			DB:       c.DB,
+			Protocol: c.Protocol,
+			PoolSize: c.PoolSize,
+		})
 	})
 
-	_, err := client.Ping(context.Background()).Result()
+	_, err := s.Client.Ping(context.Background()).Result()
 
-	return client, err
+	return s, err
 }
 
-func CloseClient(client *redis.Client) error {
-	if client == nil {
+func (s *Single) Close() error {
+	if s.Client == nil {
 		return nil
 	}
 
-	return client.Close()
+	return s.Client.Close()
 }
 
 type ClusterOption func(*Cluster)
 
-func NewClusterClient(c *ClusterConfig, opts ...ClusterOption) (*redis.ClusterClient, error) {
+func NewClusterClient(c *ClusterConfig, opts ...ClusterOption) (*Cluster, error) {
 	_ = c.initConfig()
 	cl := &Cluster{}
 
@@ -67,27 +76,29 @@ func NewClusterClient(c *ClusterConfig, opts ...ClusterOption) (*redis.ClusterCl
 	return cl.newClusterClient(c)
 }
 
-func (cl *Cluster) newClusterClient(c *ClusterConfig) (*redis.ClusterClient, error) {
+func (cl *Cluster) newClusterClient(c *ClusterConfig) (*Cluster, error) {
 	if c.PoolSize == 0 {
 		c.PoolSize = 10 * runtime.GOMAXPROCS(0)
 	}
 
-	client := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs:    c.Addrs,
-		Password: c.Password,
-		Protocol: c.Protocol,
-		PoolSize: c.PoolSize,
+	cl.once.Do(func() {
+		cl.Client = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:    c.Addrs,
+			Password: c.Password,
+			Protocol: c.Protocol,
+			PoolSize: c.PoolSize,
+		})
 	})
 
-	_, err := client.Ping(context.Background()).Result()
+	_, err := cl.Client.Ping(context.Background()).Result()
 
-	return client, err
+	return cl, err
 }
 
-func CloseClusterClient(client *redis.ClusterClient) error {
-	if client == nil {
+func (cl *Cluster) Close() error {
+	if cl.Client == nil {
 		return nil
 	}
 
-	return client.Close()
+	return cl.Client.Close()
 }

@@ -43,21 +43,33 @@ func WithLogger(logger *log.Helper) Option {
 
 func WithMetricsOptions(metrics MetricsOption) Option {
 	return func(s *Server) {
-		_ = metrics.init()
+		err := metrics.init()
+		if err != nil {
+			s.log.Warnf("failed to init metrics: %v", err)
+			return
+		}
 		s.options.Metrics = metrics
 	}
 }
 
 func WithSwagOptions(swag SwagOption) Option {
 	return func(s *Server) {
-		_ = swag.init()
+		err := swag.init()
+		if err != nil {
+			s.log.Warnf("failed to init swag: %v", err)
+			return
+		}
 		s.options.Swag = swag
 	}
 }
 
 func WithHealthOptions(health HealthOption) Option {
 	return func(s *Server) {
-		_ = health.init()
+		err := health.init()
+		if err != nil {
+			s.log.Warnf("failed to init health: %v", err)
+			return
+		}
 		s.options.Health = health
 	}
 }

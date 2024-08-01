@@ -35,9 +35,9 @@ type Option struct {
 
 type ConfigOption func(*Config)
 
-func NewConfig(cf Option, opts ...ConfigOption) *Config {
+func NewConfig(option Option, opts ...ConfigOption) *Config {
 	c := &Config{
-		Option: cf,
+		Option: option,
 		log:    log.DefaultLogger,
 	}
 

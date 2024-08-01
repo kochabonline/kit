@@ -7,10 +7,14 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
-type GinLoggerConfig struct{}
+type GinLoggerConfig struct{
+	Logger *log.Helper
+}
 
 func GinLogger() gin.HandlerFunc {
-	return GinLoggerWithConfig(GinLoggerConfig{})
+	return GinLoggerWithConfig(GinLoggerConfig{
+		Logger: log.DefaultLogger,
+	})
 }
 
 func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
@@ -33,6 +37,6 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		log.Info(params...)
+		config.Logger.Info(params...)
 	}
 }

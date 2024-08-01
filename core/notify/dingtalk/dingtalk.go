@@ -22,15 +22,15 @@ type DingTalk struct {
 
 type Option func(*DingTalk)
 
-func WithLogger(logger *log.Helper) Option {
-	return func(d *DingTalk) {
-		d.log = logger
-	}
-}
-
 func WithClient(client *http.Client) Option {
 	return func(d *DingTalk) {
 		d.client = client
+	}
+}
+
+func WithLogger(logger *log.Helper) Option {
+	return func(d *DingTalk) {
+		d.log = logger
 	}
 }
 
@@ -39,7 +39,7 @@ func New(webhook string, secret string, opts ...Option) *DingTalk {
 		Webhook: webhook,
 		Secret:  secret,
 		client:  http.DefaultClient,
-		log:     log.NewHelper(log.DefaultLogger),
+		log:     log.DefaultLogger,
 	}
 	for _, opt := range opts {
 		opt(d)

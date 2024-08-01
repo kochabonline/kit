@@ -16,18 +16,22 @@ type Mysql struct {
 
 type Option func(*Mysql)
 
-func New(c *Config, opts ...Option) (*gorm.DB, error) {
-	_ = c.initConfig()
+func New(c *Config, opts ...Option) (*Mysql, error) {
+	err := c.initConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	m := &Mysql{}
 
 	for _, opt := range opts {
 		opt(m)
 	}
 
-	return m.newClient(c)
+	return m.new(c)
 }
 
-func (m *Mysql) newClient(c *Config) (*gorm.DB, error) {
+func (m *Mysql) new(c *Config) (*Mysql, error) {
 	var err error
 	m.once.Do(func() {
 		m.Client, err = gorm.Open(mysql.Open(c.dsn()), &gorm.Config{
@@ -47,15 +51,15 @@ func (m *Mysql) newClient(c *Config) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(c.MaxOpenConns)
 	sqlDB.SetConnMaxLifetime(time.Duration(c.ConnMaxLifetime))
 
-	return m.Client, nil
+	return m, nil
 }
 
-func CloseClient(client *gorm.DB) error {
-	if client == nil {
+func (m *Mysql) Close() error {
+	if m.Client == nil {
 		return nil
 	}
 
-	sqlDB, err := client.DB()
+	sqlDB, err := m.Client.DB()
 	if err != nil {
 		return err
 	}

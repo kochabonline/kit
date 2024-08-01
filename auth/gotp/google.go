@@ -119,12 +119,34 @@ func (ga *GoogleAuthenticator) GenerateCode(secret string) (string, error) {
 
 // GenerateQRCode generates a new QR code
 func (ga *GoogleAuthenticator) GenerateQRCode(label string, issuer string, secret string) string {
-	return fmt.Sprintf("otpauth://totp/%s:%s?secret=%s&issuer=%s", label, issuer, secret, issuer)
+	var builder strings.Builder
+	builder.WriteString("otpauth://totp/")
+	builder.WriteString(label)
+	builder.WriteString(":")
+	builder.WriteString(issuer)
+	builder.WriteString("?secret=")
+	builder.WriteString(secret)
+	builder.WriteString("&issuer=")
+	builder.WriteString(issuer)
+
+	return builder.String()
 }
 
 // GenerateQRrl generates a new QR code
 func (ga *GoogleAuthenticator) GenerateQRUrl(label string, issuer string, secret string) string {
-	return fmt.Sprintf("%sotpauth://totp/%s:%s?secret=%s&issuer=%s", ga.QrApi, label, issuer, secret, issuer)
+	var builder strings.Builder
+
+	builder.WriteString(ga.QrApi)
+	builder.WriteString("otpauth://totp/")
+	builder.WriteString(label)
+	builder.WriteString(":")
+	builder.WriteString(issuer)
+	builder.WriteString("?secret=")
+	builder.WriteString(secret)
+	builder.WriteString("&issuer=")
+	builder.WriteString(issuer)
+
+	return builder.String()
 }
 
 // ValidateCode validates a code
