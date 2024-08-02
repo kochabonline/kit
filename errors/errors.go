@@ -3,6 +3,8 @@ package errors
 import (
 	"errors"
 	"fmt"
+
+	"github.com/go-playground/validator/v10"
 )
 
 const (
@@ -90,6 +92,10 @@ func FromError(err error) *Error {
 
 	if ge := new(Error); errors.As(err, &ge) {
 		return ge
+	}
+
+	if ok := errors.As(err, &validator.ValidationErrors{}); ok {
+		return BadRequest(err.Error(), "")
 	}
 
 	return New(UnknownCode, UnknownReason, err.Error())
