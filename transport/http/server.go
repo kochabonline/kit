@@ -19,6 +19,7 @@ var _ transport.Server = (*Server)(nil)
 const (
 	// DefaultAddr is the default address for the server.
 	defaultAddr = ":8080"
+	defaultName = "http"
 )
 
 // Meta is the metadata of the server.
@@ -45,7 +46,7 @@ func WithMetricsOptions(metrics MetricsOption) Option {
 	return func(s *Server) {
 		err := metrics.init()
 		if err != nil {
-			s.log.Warnf("failed to init metrics: %v", err)
+			s.log.Errorf("failed to init metrics: %v", err)
 			return
 		}
 		s.options.Metrics = metrics
@@ -56,7 +57,7 @@ func WithSwagOptions(swag SwagOption) Option {
 	return func(s *Server) {
 		err := swag.init()
 		if err != nil {
-			s.log.Warnf("failed to init swag: %v", err)
+			s.log.Errorf("failed to init swag: %v", err)
 			return
 		}
 		s.options.Swag = swag
@@ -67,7 +68,7 @@ func WithHealthOptions(health HealthOption) Option {
 	return func(s *Server) {
 		err := health.init()
 		if err != nil {
-			s.log.Warnf("failed to init health: %v", err)
+			s.log.Errorf("failed to init health: %v", err)
 			return
 		}
 		s.options.Health = health
@@ -102,7 +103,7 @@ func (s *Server) Run() error {
 		return http.ErrServerClosed
 	}
 	if s.Name == "" {
-		s.Name = "http"
+		s.Name = defaultName
 	}
 
 	if ok := transport.ValidateAddress(s.server.Addr); !ok {

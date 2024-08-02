@@ -3,19 +3,16 @@ package redis
 import (
 	"context"
 	"runtime"
-	"sync"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type Single struct {
 	Client *redis.Client
-	once   sync.Once
 }
 
 type Cluster struct {
 	Client *redis.ClusterClient
-	once   sync.Once
 }
 
 type SingleOption func(*Single)
@@ -40,14 +37,12 @@ func (s *Single) newClient(c *Config) (*Single, error) {
 		c.PoolSize = 10 * runtime.GOMAXPROCS(0)
 	}
 
-	s.once.Do(func() {
-		s.Client = redis.NewClient(&redis.Options{
-			Addr:     c.Addr(),
-			Password: c.Password,
-			DB:       c.DB,
-			Protocol: c.Protocol,
-			PoolSize: c.PoolSize,
-		})
+	s.Client = redis.NewClient(&redis.Options{
+		Addr:     c.Addr(),
+		Password: c.Password,
+		DB:       c.DB,
+		Protocol: c.Protocol,
+		PoolSize: c.PoolSize,
 	})
 
 	_, err := s.Client.Ping(context.Background()).Result()
@@ -81,13 +76,11 @@ func (cl *Cluster) newClusterClient(c *ClusterConfig) (*Cluster, error) {
 		c.PoolSize = 10 * runtime.GOMAXPROCS(0)
 	}
 
-	cl.once.Do(func() {
-		cl.Client = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:    c.Addrs,
-			Password: c.Password,
-			Protocol: c.Protocol,
-			PoolSize: c.PoolSize,
-		})
+	cl.Client = redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:    c.Addrs,
+		Password: c.Password,
+		Protocol: c.Protocol,
+		PoolSize: c.PoolSize,
 	})
 
 	_, err := cl.Client.Ping(context.Background()).Result()

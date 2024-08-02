@@ -4,20 +4,23 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/kochabonline/kit/errors"
 )
 
 type Response struct {
-	Code   int    `json:"code"`
-	Reason string `json:"reason"`
-	Data   any    `json:"data"`
+	Code    int    `json:"code"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+	Data    any    `json:"data"`
 }
 
-func NewResponse(code int, reason string, data any) *Response {
+func NewResponse(code int, reason string, message string, data any) *Response {
 	return &Response{
-		Code:   code,
-		Reason: reason,
-		Data:   data,
+		Code:    code,
+		Reason:  reason,
+		Message: message,
+		Data:    data,
 	}
 }
 
@@ -34,11 +37,16 @@ func JSONError(ctx any, err error) {
 }
 
 func GinJSON(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, NewResponse(http.StatusOK, "", data))
+	c.JSON(http.StatusOK, NewResponse(http.StatusOK, "", "", data))
 }
 
 func GinJSONError(c *gin.Context, err error) {
 	defer c.Abort()
+
+	var message string
+	if _, ok := err.(validator.ValidationErrors); ok {
+		message = err.Error()
+	}
 
 	e := errors.FromError(err)
 	httpCode := int(e.Code)
@@ -47,5 +55,5 @@ func GinJSONError(c *gin.Context, err error) {
 		httpCode = http.StatusInternalServerError
 	}
 
-	c.JSON(httpCode, NewResponse(int(e.Code), e.Reason, nil))
+	c.JSON(httpCode, NewResponse(int(e.Code), e.Reason, message, nil))
 }

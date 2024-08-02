@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"sync"
 	"time"
 
 	"gorm.io/driver/mysql"
@@ -11,7 +10,6 @@ import (
 
 type Mysql struct {
 	Client *gorm.DB
-	once   sync.Once
 }
 
 type Option func(*Mysql)
@@ -33,10 +31,8 @@ func New(c *Config, opts ...Option) (*Mysql, error) {
 
 func (m *Mysql) new(c *Config) (*Mysql, error) {
 	var err error
-	m.once.Do(func() {
-		m.Client, err = gorm.Open(mysql.Open(c.dsn()), &gorm.Config{
-			Logger: logger.Default.LogMode(logger.LogLevel(c.LogLevel())),
-		})
+	m.Client, err = gorm.Open(mysql.Open(c.dsn()), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.LogLevel(c.LogLevel())),
 	})
 	if err != nil {
 		return nil, err

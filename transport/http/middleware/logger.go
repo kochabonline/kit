@@ -7,7 +7,7 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
-type GinLoggerConfig struct{
+type GinLoggerConfig struct {
 	Logger *log.Helper
 }
 

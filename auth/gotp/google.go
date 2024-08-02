@@ -25,7 +25,9 @@ const (
 	qrapi = "https://api.qrserver.com/v1/create-qr-code/?data="
 )
 
-var GA GoogleAuthenticatorer
+var (
+	GA GoogleAuthenticatorer
+)
 
 func init() {
 	GA = NewGoogleAuthenticator()
