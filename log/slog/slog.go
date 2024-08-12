@@ -65,7 +65,7 @@ func (s *Slog) Log(l level.Level, args ...any) {
 
 	msg, ok := args[0].(string)
 	if !ok {
-		s.logger.Error("invalid log message, first argument must be a string")
+		s.logger.Error("first argument must be a string")
 		return
 	}
 	args = args[1:]

@@ -13,44 +13,39 @@ import (
 
 const (
 	defaultMsgKey                     = "msg"
+	defaultMissingValue               = "missing value"
 	defaultCallerSkipFrameCount       = 5
 	defaultHelperCallerSkipFrameCount = 5
 	defaultFilterCallerSkipFrameCount = 6
 )
 
 type Logger struct {
-	logger               zerolog.Logger
-	caller               bool
-	callerSkipFrameCount int
+	logger zerolog.Logger
 }
 
 type Option func(*Logger)
 
 func WithCaller() Option {
 	return func(z *Logger) {
-		z.caller = true
-		z.callerSkipFrameCount = defaultCallerSkipFrameCount
+		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultCallerSkipFrameCount).Logger()
 	}
 }
 
 func WithHelperCaller() Option {
 	return func(z *Logger) {
-		z.caller = true
-		z.callerSkipFrameCount = defaultHelperCallerSkipFrameCount
+		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultHelperCallerSkipFrameCount).Logger()
 	}
 }
 
 func WithFilterCaller() Option {
 	return func(z *Logger) {
-		z.caller = true
-		z.callerSkipFrameCount = defaultFilterCallerSkipFrameCount
+		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultFilterCallerSkipFrameCount).Logger()
 	}
 }
 
 func WithCallerSkipFrameCount(count int) Option {
 	return func(z *Logger) {
-		z.caller = true
-		z.callerSkipFrameCount = count
+		z.logger = z.logger.With().CallerWithSkipFrameCount(count).Logger()
 	}
 }
 
@@ -73,17 +68,12 @@ func consoleWriter() zerolog.ConsoleWriter {
 }
 
 func New(opts ...Option) *Logger {
-
 	z := &Logger{
 		logger: zerolog.New(consoleWriter()).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
 		opt(z)
-	}
-
-	if z.caller {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
 	}
 
 	return z
@@ -101,10 +91,6 @@ func NewFile(c Config, opts ...Option) *Logger {
 		opt(z)
 	}
 
-	if z.caller {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
-	}
-
 	return z
 }
 
@@ -119,10 +105,6 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 	for _, opt := range opts {
 		opt(z)
-	}
-
-	if z.caller {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
 	}
 
 	return z
@@ -159,7 +141,7 @@ func (z *Logger) Log(l level.Level, args ...any) {
 			continue
 		}
 		if i == length-1 {
-			event = event.Any(key, "missing value")
+			event = event.Any(key, defaultMissingValue)
 		} else {
 			event = event.Any(key, args[i+1])
 		}

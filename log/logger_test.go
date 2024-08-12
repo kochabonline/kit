@@ -2,9 +2,9 @@ package log
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
 
+	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log/zerolog"
 )
 
@@ -28,5 +28,5 @@ func TestLog(t *testing.T) {
 	f := NewHelper(NewFilter(zerolog.New(zerolog.WithFilterCaller()), WithFilterKey("password")))
 	f.Info("test message", "password", "12345", "user", "alex")
 	SetLogger(zerolog.New())
-	Error("test message", "error", errors.New("error message").Error())
+	Error("test message", "error", errors.BadRequest("bad request", "").Error())
 }
