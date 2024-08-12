@@ -17,14 +17,14 @@ type glogger struct {
 }
 
 func init() {
-	global.SetLogger(zerolog.New())
+	global.setLogger(zerolog.New())
 }
 
-func SetDefaultLogger(logger Logger) {
-	global.SetLogger(logger)
+func SetLogger(logger Logger) {
+	global.setLogger(logger)
 }
 
-func (l *glogger) SetLogger(logger Logger) {
+func (l *glogger) setLogger(logger Logger) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

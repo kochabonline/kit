@@ -16,8 +16,8 @@ import (
 )
 
 type App struct {
-	servers         []transport.Server
 	ctx             context.Context
+	servers         []transport.Server
 	sigs            []os.Signal
 	shutdownTimeout time.Duration
 	logger          *log.Helper
@@ -57,8 +57,8 @@ func WithLogger(logger *log.Helper) Option {
 
 func NewApp(servers []transport.Server, opts ...Option) *App {
 	app := &App{
-		servers:         servers,
 		ctx:             context.Background(),
+		servers:         servers,
 		sigs:            []os.Signal{os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT},
 		shutdownTimeout: 30 * time.Second,
 		logger:          log.DefaultLogger,

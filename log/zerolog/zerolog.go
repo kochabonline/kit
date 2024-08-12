@@ -13,16 +13,15 @@ import (
 
 const (
 	defaultMsgKey                     = "msg"
-	defaultHelperCallerSkipFrameCount = 4
-	defaultFilterCallerSkipFrameCount = 5
 	defaultCallerSkipFrameCount       = 5
+	defaultHelperCallerSkipFrameCount = 5
+	defaultFilterCallerSkipFrameCount = 6
 )
 
 type Logger struct {
 	logger               zerolog.Logger
 	caller               bool
 	callerSkipFrameCount int
-	once                 bool
 }
 
 type Option func(*Logger)
@@ -74,12 +73,17 @@ func consoleWriter() zerolog.ConsoleWriter {
 }
 
 func New(opts ...Option) *Logger {
+
 	z := &Logger{
 		logger: zerolog.New(consoleWriter()).With().Timestamp().Logger(),
 	}
 
 	for _, opt := range opts {
 		opt(z)
+	}
+
+	if z.caller {
+		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
 	}
 
 	return z
@@ -95,6 +99,10 @@ func NewFile(c Config, opts ...Option) *Logger {
 
 	for _, opt := range opts {
 		opt(z)
+	}
+
+	if z.caller {
+		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
 	}
 
 	return z
@@ -113,14 +121,14 @@ func NewMulti(c Config, opts ...Option) *Logger {
 		opt(z)
 	}
 
+	if z.caller {
+		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
+	}
+
 	return z
 }
 
 func (z *Logger) Log(l level.Level, args ...any) {
-	if z.caller && !z.once {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(z.callerSkipFrameCount).Logger()
-		z.once = true
-	}
 	var event *zerolog.Event
 
 	length := len(args)
@@ -132,7 +140,7 @@ func (z *Logger) Log(l level.Level, args ...any) {
 	case level.Debug:
 		event = z.logger.Debug()
 	case level.Info:
-		event = z.logger.Info().Stack()
+		event = z.logger.Info()
 	case level.Warn:
 		event = z.logger.Warn()
 	case level.Error:

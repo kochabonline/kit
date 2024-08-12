@@ -90,7 +90,7 @@ func (c *Config) Watch() error {
 	ch := make(chan error, 1)
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		c.log.Infof("Config file changed: %s", e.Name)
+		c.log.Infof("config file changed: %s", e.Name)
 		if err := c.Read(); err != nil {
 			ch <- err
 		}
