@@ -14,9 +14,9 @@ import (
 const (
 	defaultMsgKey                     = "msg"
 	defaultMissingValue               = "missing value"
-	defaultCallerSkipFrameCount       = 5
-	defaultHelperCallerSkipFrameCount = 5
-	defaultFilterCallerSkipFrameCount = 6
+	defaultCallerSkipFrameCount       = 4
+	defaultHelperCallerSkipFrameCount = 4
+	defaultFilterCallerSkipFrameCount = 5
 )
 
 type Logger struct {
