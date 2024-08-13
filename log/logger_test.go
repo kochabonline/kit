@@ -27,6 +27,6 @@ func TestLog(t *testing.T) {
 	h.Info("test message", "key", "value")
 	f := NewHelper(NewFilter(zerolog.New(zerolog.WithFilterCaller()), WithFilterKey("password")))
 	f.Info("test message", "password", "12345", "user", "alex")
-	SetLogger(zerolog.New(zerolog.WithCaller()))
+	SetLogger(zerolog.New())
 	Error("test message", "error", errors.BadRequest("bad request", "").Error())
 }

@@ -10,23 +10,27 @@ import (
 )
 
 var (
-	mu     sync.Mutex
 	global = new(glogger)
 )
 
 type glogger struct {
+	mu sync.Mutex
 	Logger
 }
 
 func init() {
-	SetLogger(zerolog.New())
+	global.setLogger(zerolog.New())
+}
+
+func (g *glogger) setLogger(logger Logger) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.Logger = logger
 }
 
 func SetLogger(logger Logger) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	global.Logger = logger
+	global.setLogger(logger)
 }
 
 func Debug(args ...any) {

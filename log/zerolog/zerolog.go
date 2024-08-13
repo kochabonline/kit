@@ -17,6 +17,7 @@ const (
 	defaultCallerSkipFrameCount       = 4
 	defaultHelperCallerSkipFrameCount = 4
 	defaultFilterCallerSkipFrameCount = 5
+	defaultGlobalCallerSkipFrameCount = 5
 )
 
 type Logger struct {
@@ -40,6 +41,12 @@ func WithHelperCaller() Option {
 func WithFilterCaller() Option {
 	return func(z *Logger) {
 		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultFilterCallerSkipFrameCount).Logger()
+	}
+}
+
+func WithGlobalCaller() Option {
+	return func(z *Logger) {
+		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultGlobalCallerSkipFrameCount).Logger()
 	}
 }
 
