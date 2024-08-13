@@ -24,37 +24,11 @@ type Logger struct {
 	logger zerolog.Logger
 }
 
+type Context struct {
+	l *Logger
+}
+
 type Option func(*Logger)
-
-func WithCaller() Option {
-	return func(z *Logger) {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultCallerSkipFrameCount).Logger()
-	}
-}
-
-func WithHelperCaller() Option {
-	return func(z *Logger) {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultHelperCallerSkipFrameCount).Logger()
-	}
-}
-
-func WithFilterCaller() Option {
-	return func(z *Logger) {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultFilterCallerSkipFrameCount).Logger()
-	}
-}
-
-func WithGlobalCaller() Option {
-	return func(z *Logger) {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(defaultGlobalCallerSkipFrameCount).Logger()
-	}
-}
-
-func WithCallerSkipFrameCount(count int) Option {
-	return func(z *Logger) {
-		z.logger = z.logger.With().CallerWithSkipFrameCount(count).Logger()
-	}
-}
 
 func init() {
 	zerolog.TimeFieldFormat = time.DateTime
@@ -118,13 +92,11 @@ func NewMulti(c Config, opts ...Option) *Logger {
 }
 
 func (z *Logger) Log(l level.Level, args ...any) {
-	var event *zerolog.Event
-
-	length := len(args)
-	if length == 0 {
+	if len(args) == 0 {
 		return
 	}
 
+	var event *zerolog.Event
 	switch l {
 	case level.Debug:
 		event = z.logger.Debug()
@@ -140,19 +112,51 @@ func (z *Logger) Log(l level.Level, args ...any) {
 
 	event = event.Any(defaultMsgKey, args[0])
 	args = args[1:]
-	length--
 
-	for i := 0; i < length; i += 2 {
+	for i := 0; i < len(args); i += 2 {
 		key, ok := args[i].(string)
 		if !ok {
 			continue
 		}
-		if i == length-1 {
-			event = event.Any(key, defaultMissingValue)
-		} else {
+		if i+1 < len(args) {
 			event = event.Any(key, args[i+1])
+		} else {
+			event = event.Any(key, defaultMissingValue)
 		}
 	}
 
 	event.Send()
+}
+
+func (z *Logger) With() *Context {
+	return &Context{l: z}
+}
+
+func (c *Context) Caller() *Context {
+	c.l.logger = c.l.logger.With().CallerWithSkipFrameCount(defaultCallerSkipFrameCount).Logger()
+	return c
+}
+
+func (c *Context) HelperCaller() *Context {
+	c.l.logger = c.l.logger.With().CallerWithSkipFrameCount(defaultHelperCallerSkipFrameCount).Logger()
+	return c
+}
+
+func (c *Context) FilterCaller() *Context {
+	c.l.logger = c.l.logger.With().CallerWithSkipFrameCount(defaultFilterCallerSkipFrameCount).Logger()
+	return c
+}
+
+func (c *Context) GlobalCaller() *Context {
+	c.l.logger = c.l.logger.With().CallerWithSkipFrameCount(defaultGlobalCallerSkipFrameCount).Logger()
+	return c
+}
+
+func (c *Context) CallerSkipFrameCount(count int) *Context {
+	c.l.logger = c.l.logger.With().CallerWithSkipFrameCount(count).Logger()
+	return c
+}
+
+func (c *Context) Logger() *Logger {
+	return c.l
 }

@@ -4,32 +4,32 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kochabonline/kit/log/level"
 )
 
 const (
-	defaultCallerSkipFrameCount = 3
+	defaultCallerSkipFrameCount       = 4
+	defaultHelperCallerSkipFrameCount = 4
+	defaultFilterCallerSkipFrameCount = 5
+	defaultGlobalCallerSkipFrameCount = 5
 )
 
 type Slog struct {
-	logger *slog.Logger
+	caller               bool
+	callerSkipFrameCount int
+	logger               *slog.Logger
+}
+
+type Context struct {
+	l *Slog
 }
 
 type Option func(*Slog)
-
-func WithCaller() Option {
-	return func(s *Slog) {
-		s.logger = s.logger.With("caller", caller(defaultCallerSkipFrameCount))
-	}
-}
-
-func WithCallerSkipFrameCount(count int) Option {
-	return func(s *Slog) {
-		s.logger = s.logger.With("caller", caller(count))
-	}
-}
 
 func New(opts ...Option) *Slog {
 	s := &Slog{
@@ -44,6 +44,10 @@ func New(opts ...Option) *Slog {
 }
 
 func (s *Slog) log(l level.Level, msg string, args ...any) {
+	if s.caller {
+		args = append(args, "caller", caller(s.callerSkipFrameCount))
+	}
+
 	switch l {
 	case level.Debug:
 		s.logger.Debug(msg, args...)
@@ -71,6 +75,44 @@ func (s *Slog) Log(l level.Level, args ...any) {
 	args = args[1:]
 
 	s.log(l, msg, args...)
+}
+
+func (s *Slog) With() *Context {
+	return &Context{l: s}
+}
+
+func (c *Context) Caller() *Context {
+	c.l.caller = true
+	c.l.callerSkipFrameCount = defaultCallerSkipFrameCount
+	return c
+}
+
+func (c *Context) HelperCaller() *Context {
+	c.l.caller = true
+	c.l.callerSkipFrameCount = defaultHelperCallerSkipFrameCount
+	return c
+}
+
+func (c *Context) FilterCaller() *Context {
+	c.l.caller = true
+	c.l.callerSkipFrameCount = defaultFilterCallerSkipFrameCount
+	return c
+}
+
+func (c *Context) GlobalCaller() *Context {
+	c.l.caller = true
+	c.l.callerSkipFrameCount = defaultGlobalCallerSkipFrameCount
+	return c
+}
+
+func (c *Context) CallerSkipFrameCount(count int) *Context {
+	c.l.caller = true
+	c.l.callerSkipFrameCount = count
+	return c
+}
+
+func (c *Context) Logger() *Slog {
+	return c.l
 }
 
 func HandlerOptions() *slog.HandlerOptions {
@@ -103,4 +145,14 @@ func HandlerOptions() *slog.HandlerOptions {
 			return a
 		},
 	}
+}
+
+func caller(depth int) string {
+	_, file, line, _ := runtime.Caller(depth)
+	idx := strings.LastIndexByte(file, '/')
+	if idx == -1 {
+		return file[idx+1:] + ":" + strconv.Itoa(line)
+	}
+	idx = strings.LastIndexByte(file[:idx], '/')
+	return file[idx+1:] + ":" + strconv.Itoa(line)
 }

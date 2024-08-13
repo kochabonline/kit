@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/kochabonline/kit/errors"
+	"github.com/kochabonline/kit/log/slog"
 	"github.com/kochabonline/kit/log/zerolog"
 )
 
@@ -21,12 +22,14 @@ func (m *mock) String() string {
 
 func TestLog(t *testing.T) {
 	m := mock{Name: "test"}
-	h := NewHelper(zerolog.New(zerolog.WithCaller()))
-	h.Debug("test message", "key", "value")
+	h := NewHelper(zerolog.New().With().HelperCaller().Logger())
 	h.Debug("test message", "mock", m)
 	h.Info("test message", "key", "value")
-	f := NewHelper(NewFilter(zerolog.New(zerolog.WithFilterCaller()), WithFilterKey("password")))
+	f := NewHelper(NewFilter(zerolog.New().With().FilterCaller().Logger(), WithFilterKey("password")))
 	f.Info("test message", "password", "12345", "user", "alex")
-	SetLogger(zerolog.New())
+	SetLogger(zerolog.New().With().Caller().Logger())
 	Error("test message", "error", errors.BadRequest("bad request", "").Error())
+	s := NewHelper(slog.New().With().Caller().Logger())
+	s.Info("test message", "key", "value")
+	s.Debug("test message", "mock", m)
 }
