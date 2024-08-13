@@ -9,26 +9,24 @@ import (
 	"github.com/kochabonline/kit/log/zerolog"
 )
 
-var global = new(glogger)
+var (
+	mu     sync.Mutex
+	global = new(glogger)
+)
 
 type glogger struct {
-	mu sync.Mutex
 	Logger
 }
 
 func init() {
-	global.setLogger(zerolog.New())
+	SetLogger(zerolog.New())
 }
 
 func SetLogger(logger Logger) {
-	global.setLogger(logger)
-}
+	mu.Lock()
+	defer mu.Unlock()
 
-func (l *glogger) setLogger(logger Logger) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.Logger = logger
+	global.Logger = logger
 }
 
 func Debug(args ...any) {
