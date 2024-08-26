@@ -12,6 +12,12 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
+type Provider int
+
+const (
+	ProviderFile Provider = iota
+)
+
 type Interface interface {
 	Read() error
 	Watch() error
@@ -34,6 +40,12 @@ type Option struct {
 }
 
 type ConfigOption func(*Config)
+
+func WithLogger(log *log.Helper) ConfigOption {
+	return func(c *Config) {
+		c.log = log
+	}
+}
 
 func NewConfig(option Option, opts ...ConfigOption) *Config {
 	c := &Config{

@@ -3,6 +3,7 @@ package mysql
 import (
 	"time"
 
+	"github.com/kochabonline/kit/log"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -59,6 +60,6 @@ func (m *Mysql) Close() error {
 	if err != nil {
 		return err
 	}
-
+	log.Info("Closing MySQL connection")
 	return sqlDB.Close()
 }

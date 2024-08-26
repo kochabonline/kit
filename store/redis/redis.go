@@ -4,6 +4,7 @@ import (
 	"context"
 	"runtime"
 
+	"github.com/kochabonline/kit/log"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -54,7 +55,7 @@ func (s *Single) Close() error {
 	if s.Client == nil {
 		return nil
 	}
-
+	log.Info("Closing redis client")
 	return s.Client.Close()
 }
 
@@ -92,6 +93,6 @@ func (cl *Cluster) Close() error {
 	if cl.Client == nil {
 		return nil
 	}
-
+	log.Info("Closing redis cluster client")
 	return cl.Client.Close()
 }
