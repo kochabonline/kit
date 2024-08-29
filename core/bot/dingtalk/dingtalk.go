@@ -6,18 +6,20 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/core/bot"
 )
+
+var _ bot.HttpClient = (*DingTalk)(nil)
 
 type DingTalk struct {
 	Webhook string `json:"webhook"`
 	Secret  string `json:"secret"`
 	client  *http.Client
-	log     *log.Helper
 }
 
 type Option func(*DingTalk)
@@ -28,18 +30,36 @@ func WithClient(client *http.Client) Option {
 	}
 }
 
-func WithLogger(logger *log.Helper) Option {
-	return func(d *DingTalk) {
-		d.log = logger
-	}
-}
-
 func New(webhook string, secret string, opts ...Option) *DingTalk {
 	d := &DingTalk{
 		Webhook: webhook,
 		Secret:  secret,
 		client:  http.DefaultClient,
-		log:     log.DefaultLogger,
+	}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
+}
+
+func NewPool(webhook string, secret string, opts ...Option) *DingTalk {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	d := &DingTalk{
+		Webhook: webhook,
+		Secret:  secret,
+		client: &http.Client{
+			Transport: transport,
+		},
 	}
 	for _, opt := range opts {
 		opt(d)
@@ -66,30 +86,27 @@ func (d *DingTalk) url() string {
 	return fmt.Sprintf("%s&timestamp=%s&sign=%s", d.Webhook, timestamp, sign)
 }
 
-func (d *DingTalk) Send(message Message) error {
-	msgBytes, err := message.ToBytes()
+func (d *DingTalk) Do(req *http.Request) (*http.Response, error) {
+	return d.client.Do(req)
+}
+
+func (d *DingTalk) Send(message bot.Message) (*http.Response, error) {
+	msgBytes, err := message.Marshal()
 	if err != nil {
-		d.log.Error("failed to marshal message", "error", err, "body", message)
-		return err
+		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", d.url(), bytes.NewBuffer(msgBytes))
+	req, err := http.NewRequest(http.MethodPost, d.url(), bytes.NewBuffer(msgBytes))
 	if err != nil {
-		d.log.Error("failed to create request", "error", err, "body", message)
-		return err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := d.client.Do(req)
+	resp, err := d.Do(req)
 	if err != nil {
-		d.log.Error("failed to send message", "error", err, "body", message)
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		d.log.Error("failed to send message", "status", resp.Status, "body", message)
-		return fmt.Errorf("failed to send message, status: %s", resp.Status)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	return nil
+	return resp, nil
 }

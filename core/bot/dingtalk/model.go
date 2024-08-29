@@ -2,10 +2,6 @@ package dingtalk
 
 import "encoding/json"
 
-type Message interface {
-	ToBytes() ([]byte, error)
-}
-
 type TextMessage struct {
 	MsgType string `json:"msgtype"`
 	Text    struct {
@@ -18,13 +14,13 @@ type TextMessage struct {
 	} `json:"at"`
 }
 
-func (m *TextMessage) ToBytes() ([]byte, error) {
+func (m *TextMessage) Marshal() ([]byte, error) {
 	m.MsgType = "text"
 	return json.Marshal(m)
 }
 
 func (m *TextMessage) String() string {
-	b, _ := m.ToBytes()
+	b, _ := m.Marshal()
 	return string(b)
 }
 
@@ -67,13 +63,13 @@ type MarkdownMessage struct {
 	} `json:"at"`
 }
 
-func (m *MarkdownMessage) ToBytes() ([]byte, error) {
+func (m *MarkdownMessage) Marshal() ([]byte, error) {
 	m.MsgType = "markdown"
 	return json.Marshal(m)
 }
 
 func (m *MarkdownMessage) String() string {
-	b, _ := m.ToBytes()
+	b, _ := m.Marshal()
 	return string(b)
 }
 
@@ -118,13 +114,13 @@ type LinkMessage struct {
 	} `json:"link"`
 }
 
-func (m *LinkMessage) ToBytes() ([]byte, error) {
+func (m *LinkMessage) Marshal() ([]byte, error) {
 	m.MsgType = "link"
 	return json.Marshal(m)
 }
 
 func (m *LinkMessage) String() string {
-	b, _ := m.ToBytes()
+	b, _ := m.Marshal()
 	return string(b)
 }
 
@@ -164,13 +160,13 @@ type ActionCardMessage struct {
 	} `json:"actionCard"`
 }
 
-func (m *ActionCardMessage) ToBytes() ([]byte, error) {
+func (m *ActionCardMessage) Marshal() ([]byte, error) {
 	m.MsgType = "actionCard"
 	return json.Marshal(m)
 }
 
 func (m *ActionCardMessage) String() string {
-	b, _ := m.ToBytes()
+	b, _ := m.Marshal()
 	return string(b)
 }
 
@@ -211,13 +207,13 @@ type FeedCardMessage struct {
 	} `json:"feedCard"`
 }
 
-func (m *FeedCardMessage) ToBytes() ([]byte, error) {
+func (m *FeedCardMessage) Marshal() ([]byte, error) {
 	m.MsgType = "feedCard"
 	return json.Marshal(m)
 }
 
 func (m *FeedCardMessage) String() string {
-	b, _ := m.ToBytes()
+	b, _ := m.Marshal()
 	return string(b)
 }
 

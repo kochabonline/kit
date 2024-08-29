@@ -4,7 +4,6 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/kochabonline/kit/log"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -19,8 +18,7 @@ type Cluster struct {
 type SingleOption func(*Single)
 
 func NewClient(c *Config, opts ...SingleOption) (*Single, error) {
-	err := c.initConfig()
-	if err != nil {
+	if err := c.initConfig(); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +53,7 @@ func (s *Single) Close() error {
 	if s.Client == nil {
 		return nil
 	}
-	log.Info("Closing redis client")
+	
 	return s.Client.Close()
 }
 
@@ -93,6 +91,6 @@ func (cl *Cluster) Close() error {
 	if cl.Client == nil {
 		return nil
 	}
-	log.Info("Closing redis cluster client")
+
 	return cl.Client.Close()
 }

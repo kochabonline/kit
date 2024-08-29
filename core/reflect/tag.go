@@ -62,6 +62,38 @@ func SetDefaultTag(obj any) error {
 					return err
 				}
 				value.SetBool(parse)
+			case reflect.Slice:
+				elemKind := value.Type().Elem().Kind()
+				switch elemKind {
+				case reflect.String:
+					value.Set(reflect.ValueOf([]string{tag}))
+				case reflect.Int:
+					parse, err := strconv.ParseInt(tag, 10, 64)
+					if err != nil {
+						return err
+					}
+					value.Set(reflect.ValueOf([]int64{parse}))
+				case reflect.Uint:
+					parse, err := strconv.ParseUint(tag, 10, 64)
+					if err != nil {
+						return err
+					}
+					value.Set(reflect.ValueOf([]uint64{parse}))
+				case reflect.Float64:
+					parse, err := strconv.ParseFloat(tag, 64)
+					if err != nil {
+						return err
+					}
+					value.Set(reflect.ValueOf([]float64{parse}))
+				case reflect.Bool:
+					parse, err := strconv.ParseBool(tag)
+					if err != nil {
+						return err
+					}
+					value.Set(reflect.ValueOf([]bool{parse}))
+				default:
+					return errors.New("unsupported slice element type")
+				}
 			case reflect.Ptr:
 				value.Set(reflect.New(value.Type().Elem()))
 			case reflect.Struct:

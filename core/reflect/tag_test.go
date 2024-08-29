@@ -3,13 +3,14 @@ package reflect
 import "testing"
 
 type Mock struct {
-	Name  string `default:"John"`
-	Age   int    `default:"18"`
-	Hobby struct {
-		Basketball string `default:"basketball"`
-		Football   string `default:"football"`
+	Name    string   `default:"John"`
+	Age     int      `default:"18"`
+	Hobby   []string `default:"basketball,football"`
+	Enabled bool     `default:"true"`
+	Address struct {
+		Province string `default:"New York"`
+		City     string `default:"New York"`
 	}
-	Enabled bool `json:"enabled" default:"true"`
 }
 
 func TestTag(t *testing.T) {
