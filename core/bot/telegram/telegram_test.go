@@ -6,10 +6,10 @@ import (
 )
 
 func TestSend(t *testing.T) {
-	tg := New("7371112917:AAEysG0bv4CEEnRrdMHK0LNWR6KUTHRjiuw")
+	tg := New("7371112917:xx")
 	resp, err := tg.Send(NewSendMessage().
 		With().
-		ChatId(-4592139533).
+		ChatId(-12345678).
 		Text("Hello, World").
 		ParseMode(MarkdownV2).
 		Message())
@@ -20,7 +20,7 @@ func TestSend(t *testing.T) {
 }
 
 func TestHandleCommands(t *testing.T) {
-	tg := New("7371112917:AAEysG0bv4CEEnRrdMHK0LNWR6KUTHRjiuw")
+	tg := New("7023209709:xx")
 	tg.HandleCommands()
 	defer tg.Close()
 	time.Sleep(20 * time.Second)

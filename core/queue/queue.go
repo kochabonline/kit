@@ -3,14 +3,20 @@ package queue
 import "sync"
 
 type SimpleQueue[T comparable] interface {
+	// Touch is a no-op function that can be used to touch the queue
 	Touch(item T)
+	// Push adds an item to the queue
 	Push(item T)
+	// Len returns the number of items in the queue
 	Len() int
+	// Pop removes and returns the first item in the queue
 	Pop() (item T)
 }
 
+// simpleQueue is a simple implementation of a queue
 type simpleQueue[T comparable] []T
 
+// DefaultQueue returns a new instance of a simpleQueue
 func DefaultQueue[T comparable]() SimpleQueue[T] {
 	return new(simpleQueue[T])
 }

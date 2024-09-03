@@ -12,18 +12,15 @@ func NewStore() *Store {
 	}
 }
 
-func (s *Store) AddCommand(command string, f func() string) {
-	s.command[command] = f
+func (s *Store) AddCommand(command string, fn func() string) {
+	s.command[command] = fn
 }
 
 func (s *Store) getCommand(command string) (func() string, bool) {
-	f, ok := s.command[command]
-	return f, ok
+	fn, ok := s.command[command]
+	return fn, ok
 }
 
 func init() {
 	BotCommand = NewStore()
-	BotCommand.AddCommand("help", func() string {
-		return "help"
-	})
 }
