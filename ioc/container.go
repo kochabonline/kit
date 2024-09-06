@@ -11,15 +11,14 @@ const (
 	ControllerNamespace = "controller"
 )
 
-var Container = &Store{
-	namespaces: map[string]namespace{
+var Container = new(Store)
+
+func init() {
+	Container = NewStore(WithNamespaces(map[string]namespace{
 		ConfigNamespace:     {name: ConfigNamespace, object: map[string]object{}, priority: -9},
 		DataBaseNamespace:   {name: DataBaseNamespace, object: map[string]object{}, priority: -8},
 		HandlerNamespace:    {name: HandlerNamespace, object: map[string]object{}, priority: -7},
 		ControllerNamespace: {name: ControllerNamespace, object: map[string]object{}, priority: -6},
-	},
-}
-
-func init() {
+	}))
 	Container.SetLogger(log.DefaultLogger)
 }

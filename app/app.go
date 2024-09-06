@@ -20,6 +20,7 @@ type App struct {
 	servers         []transport.Server
 	sigs            []os.Signal
 	shutdownTimeout time.Duration
+	cleanup         []func()
 	logger          *log.Helper
 }
 
@@ -46,6 +47,12 @@ func WithSignal(sig ...os.Signal) Option {
 func WithShutdownTimeout(timeout time.Duration) Option {
 	return func(a *App) {
 		a.shutdownTimeout = timeout
+	}
+}
+
+func WithCleanup(cleanup ...func()) Option {
+	return func(a *App) {
+		a.cleanup = append(a.cleanup, cleanup...)
 	}
 }
 
@@ -94,6 +101,12 @@ func (a *App) Run() error {
 
 	wg.Wait()
 
+	// Run cleanup functions
+	for _, c := range a.cleanup {
+		c()
+	}
+
+	// Handle signals
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, a.sigs...)
 
@@ -107,6 +120,7 @@ func (a *App) Run() error {
 		}
 	})
 
+	// Wait for all goroutines to finish
 	if err := eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}

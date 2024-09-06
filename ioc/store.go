@@ -13,16 +13,36 @@ type Store struct {
 	log        *log.Helper
 }
 
+type Option func(*Store)
+
 type namespace struct {
 	name     string
 	object   map[string]object
-	sorted   []*object
 	priority int
+	sorted   []*object
 }
 
 type object struct {
 	ioc      Ioc
 	priority int
+}
+
+func WithNamespaces(namespaces map[string]namespace) Option {
+	return func(s *Store) {
+		s.namespaces = namespaces
+	}
+}
+
+func NewStore(opts ...Option) *Store {
+	store := &Store{
+		namespaces: make(map[string]namespace),
+	}
+
+	for _, opt := range opts {
+		opt(store)
+	}
+
+	return store
 }
 
 func (s *Store) sort() {
@@ -94,18 +114,23 @@ func (s *Store) RegisterNamespace(name string, priority int) {
 	s.log.Infof("[register] | namespace: %s | priority: %d", name, priority)
 }
 
-func (s *Store) Register(nsname string, ioc Ioc, priority ...int) {
+func (s *Store) Register(nsname string, ioc Ioc) {
 	if _, ok := s.namespaces[nsname]; !ok {
-		s.log.Errorf("namespace %s not found", nsname)
+		s.log.Fatalf("register %s failed: namespace %s not found", ioc.Name(), nsname)
 		return
 	}
 
-	p := 0
-	if len(priority) > 0 {
-		p = priority[0]
+	priority := len(s.namespaces[nsname].object)
+	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: priority}
+}
+
+func (s *Store) RegisterWithPriority(nsname string, ioc Ioc, priority int) {
+	if _, ok := s.namespaces[nsname]; !ok {
+		s.log.Fatalf("register %s failed: namespace %s not found", ioc.Name(), nsname)
+		return
 	}
 
-	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: p}
+	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: priority}
 }
 
 func (s *Store) Get(nsname string, name string) Ioc {
