@@ -21,15 +21,25 @@ func (m *mock) String() string {
 }
 
 func TestLog(t *testing.T) {
-	m := mock{Name: "test"}
+	m := &mock{Name: "test", Age: 10}
 	h := NewHelper(zerolog.New().With().HelperCaller().Logger())
-	h.Debug("test message", "mock", m)
+	h.Debug("test message")
+	h.Debug("test message: ", "value")
+	h.Error(errors.New(400, "reason", "test"))
+	h.Info(m)
 	h.Info("test message", "key", "value")
-	f := NewHelper(NewFilter(zerolog.New().With().FilterCaller().Logger(), WithFilterKey("password")))
-	f.Info("test message", "password", "12345", "user", "alex")
-	SetLogger(zerolog.New().With().Caller().Logger())
-	Error("test message", "error", errors.BadRequest("bad request", "").Error())
-	s := NewHelper(slog.New().With().Caller().Logger())
-	s.Info("test message", "key", "value")
-	s.Debug("test message", "mock", m)
+}
+
+func TestLogf(t *testing.T) {
+	h := NewHelper(zerolog.New().With().HelperCaller().Logger())
+	h.Debugf("test message %s %s", "value", "value")
+}
+
+func TestLogw(t *testing.T) {
+	h := NewHelper(zerolog.New().With().HelperCaller().Logger())
+	h.Debugw("key", "value")
+	h.Errorw("error", errors.New(400, "reason", "test"))
+
+	s := NewHelper(slog.New().With().HelperCaller().Logger())
+	s.Debugw("test message", "key", "value")
 }

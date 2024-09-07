@@ -34,43 +34,64 @@ func SetLogger(logger Logger) {
 }
 
 func Debug(args ...any) {
-	global.Log(level.Debug, args...)
+	global.Log(level.Debug, defaultMsgKey, fmt.Sprint(args...))
 }
 
 func Debugf(format string, args ...any) {
-	global.Log(level.Debug, fmt.Sprintf(format, args...))
+	global.Log(level.Debug, defaultMsgKey, fmt.Sprintf(format, args...))
+}
+
+func Debugw(msg string, keyvals ...any) {
+	global.Log(level.Debug, keyvals...)
 }
 
 func Info(args ...any) {
-	global.Log(level.Info, args...)
+	global.Log(level.Info, defaultMsgKey, fmt.Sprint(args...))
 }
 
 func Infof(format string, args ...any) {
-	global.Log(level.Info, fmt.Sprintf(format, args...))
+	global.Log(level.Info, defaultMsgKey, fmt.Sprintf(format, args...))
+}
+
+func Infow(msg string, keyvals ...any) {
+	global.Log(level.Info, keyvals...)
 }
 
 func Warn(args ...any) {
-	global.Log(level.Warn, args...)
+	global.Log(level.Warn, defaultMsgKey, fmt.Sprint(args...))
 }
 
 func Warnf(format string, args ...any) {
-	global.Log(level.Warn, fmt.Sprintf(format, args...))
+	global.Log(level.Warn, defaultMsgKey, fmt.Sprintf(format, args...))
+}
+
+func Warnw(msg string, keyvals ...any) {
+	global.Log(level.Warn, keyvals...)
 }
 
 func Error(args ...any) {
-	global.Log(level.Error, args...)
+	global.Log(level.Error, defaultMsgKey, fmt.Sprint(args...))
 }
 
 func Errorf(format string, args ...any) {
-	global.Log(level.Error, fmt.Sprintf(format, args...))
+	global.Log(level.Error, defaultMsgKey, fmt.Sprintf(format, args...))
+}
+
+func Errorw(msg string, keyvals ...any) {
+	global.Log(level.Error, keyvals...)
 }
 
 func Fatal(args ...any) {
-	global.Log(level.Fatal, args...)
+	global.Log(level.Fatal, defaultMsgKey, fmt.Sprint(args...))
 	os.Exit(1)
 }
 
 func Fatalf(format string, args ...any) {
-	global.Log(level.Fatal, fmt.Sprintf(format, args...))
+	global.Log(level.Fatal, defaultMsgKey, fmt.Sprintf(format, args...))
+	os.Exit(1)
+}
+
+func Fatalw(msg string, keyvals ...any) {
+	global.Log(level.Fatal, keyvals...)
 	os.Exit(1)
 }

@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	defaultMsgKey                     = "msg"
 	defaultMissingValue               = "missing value"
 	defaultCallerSkipFrameCount       = 4
 	defaultHelperCallerSkipFrameCount = 4
@@ -22,7 +21,6 @@ const (
 
 type Logger struct {
 	logger zerolog.Logger
-	msgKey string
 }
 
 type Context struct {
@@ -30,12 +28,6 @@ type Context struct {
 }
 
 type Option func(*Logger)
-
-func WithMsgKey(key string) Option {
-	return func(z *Logger) {
-		z.msgKey = key
-	}
-}
 
 func init() {
 	zerolog.TimeFieldFormat = time.DateTime
@@ -58,7 +50,6 @@ func consoleWriter() zerolog.ConsoleWriter {
 func New(opts ...Option) *Logger {
 	z := &Logger{
 		logger: zerolog.New(consoleWriter()).With().Timestamp().Logger(),
-		msgKey: defaultMsgKey,
 	}
 
 	for _, opt := range opts {
@@ -74,7 +65,6 @@ func NewFile(c Config, opts ...Option) *Logger {
 
 	z := &Logger{
 		logger: zerolog.New(writer).With().Timestamp().Logger(),
-		msgKey: defaultMsgKey,
 	}
 
 	for _, opt := range opts {
@@ -91,7 +81,6 @@ func NewMulti(c Config, opts ...Option) *Logger {
 
 	z := &Logger{
 		logger: zerolog.New(multi).With().Timestamp().Logger(),
-		msgKey: defaultMsgKey,
 	}
 
 	for _, opt := range opts {
@@ -118,11 +107,6 @@ func (z *Logger) Log(l level.Level, args ...any) {
 		event = z.logger.Error().Stack()
 	case level.Fatal:
 		event = z.logger.Fatal().Stack()
-	}
-
-	if z.msgKey != "" {
-		event = event.Any(z.msgKey, args[0])
-		args = args[1:]
 	}
 
 	for i := 0; i < len(args); i += 2 {
