@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/log/zerolog"
 )
 
 type GinLoggerConfig struct {
@@ -13,7 +14,7 @@ type GinLoggerConfig struct {
 
 func GinLogger() gin.HandlerFunc {
 	return GinLoggerWithConfig(GinLoggerConfig{
-		Logger: log.DefaultLogger,
+		Logger: log.NewHelper(zerolog.New(zerolog.WithMsgKey(""))),
 	})
 }
 
@@ -25,7 +26,6 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 
 		params := make([]any, 0, 10)
 		params = append(params,
-			"",
 			"method", c.Request.Method,
 			"uri", c.Request.RequestURI,
 			"cost", cost.String(),
