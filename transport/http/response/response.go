@@ -8,16 +8,18 @@ import (
 )
 
 type Response struct {
-	Code   int    `json:"code"`
-	Reason string `json:"reason"`
-	Data   any    `json:"data"`
+	Code    int    `json:"code"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+	Data    any    `json:"data,omitempty"`
 }
 
-func NewResponse(code int, reason string, data any) *Response {
+func NewResponse(code int, reason string, message string, data any) *Response {
 	return &Response{
-		Code:   code,
-		Reason: reason,
-		Data:   data,
+		Code:    code,
+		Reason:  reason,
+		Message: message,
+		Data:    data,
 	}
 }
 
@@ -34,7 +36,7 @@ func JSONError(ctx any, err error) {
 }
 
 func GinJSON(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, NewResponse(http.StatusOK, "", data))
+	c.JSON(http.StatusOK, NewResponse(http.StatusOK, "", "", data))
 }
 
 func GinJSONError(c *gin.Context, err error) {
@@ -43,9 +45,16 @@ func GinJSONError(c *gin.Context, err error) {
 	e := errors.FromError(err)
 	httpCode := int(e.Code)
 
+	// If http status text is empty, default to 500
 	if http.StatusText(httpCode) == "" {
 		httpCode = http.StatusInternalServerError
 	}
 
-	c.JSON(httpCode, NewResponse(int(e.Code), e.Reason, nil))
+	// Only return message for client errors
+	var msg string
+	if httpCode >= 400 && httpCode < 500 {
+		msg = e.Message
+	}
+
+	c.JSON(httpCode, NewResponse(int(e.Code), e.Reason, msg, nil))
 }
