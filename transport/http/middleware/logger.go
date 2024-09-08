@@ -37,7 +37,7 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 			"user_agent", c.Request.UserAgent(),
 		)
 
-		if requestId := c.Request.Header.Get("X-Request-ID"); requestId != "" {
+		if requestId := c.Request.Header.Get("X-Request-Id"); requestId != "" {
 			params = append(params, "request_id", requestId)
 		}
 
