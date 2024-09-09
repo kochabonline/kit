@@ -23,18 +23,13 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 		c.Next()
 		cost := time.Since(start)
 
-		params := make([]any, 0, 12)
+		params := make([]any, 0, 10)
 		params = append(params,
-			"timestamp", time.Now().Format(time.RFC3339),
 			"method", c.Request.Method,
 			"uri", c.Request.RequestURI,
 			"cost", cost.String(),
 			"status", c.Writer.Status(),
 			"client_ip", c.ClientIP(),
-			"query", c.Request.URL.Query(),
-			"header", c.Request.Header,
-			"body", c.Request.Body,
-			"user_agent", c.Request.UserAgent(),
 		)
 
 		if requestId := c.Request.Header.Get("X-Request-Id"); requestId != "" {

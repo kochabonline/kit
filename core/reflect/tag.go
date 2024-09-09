@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+type TagConfig struct {
+	Tag string
+}
+
+func WithTagTag(tag string) func(*TagConfig) {
+	return func(c *TagConfig) {
+		c.Tag = tag
+	}
+}
+
 func must(target any) (reflect.Type, reflect.Value, error) {
 	valueOf := reflect.ValueOf(target)
 
@@ -21,15 +31,22 @@ func must(target any) (reflect.Type, reflect.Value, error) {
 	return valueOf.Type().Elem(), valueOf.Elem(), nil
 }
 
-func SetDefaultTag(target any) error {
+func SetDefaultTag(target any, opts ...func(*TagConfig)) error {
 	t, v, err := must(target)
 	if err != nil {
 		return err
 	}
 
+	config := &TagConfig{
+		Tag: "default",
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		tag := field.Tag.Get("default")
+		tag := field.Tag.Get(config.Tag)
 		// Even if the default tag value is empty, as long as it is a struct type,
 		// the default value needs to be set recursively
 		if tag == "" && field.Type.Kind() != reflect.Struct {

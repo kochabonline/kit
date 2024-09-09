@@ -1,6 +1,8 @@
 package tools
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestTools(t *testing.T) {
 	t.Log("Id:", Id())

@@ -25,7 +25,7 @@ type Queue[T comparable] interface {
 	Pop() (item T)
 }
 
-// DefaultQueue returns a new instance of a simpleQueue
+// DefaultQueue returns a new queue
 func DefaultQueue[T comparable]() Queue[T] {
 	return new(queue[T])
 }

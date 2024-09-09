@@ -15,10 +15,10 @@ func TestMap(t *testing.T) {
 	mock := mapMock{Name: "John", Age: 0, Address: struct {
 		Province string `json:"province"`
 		City     string `json:"City"`
-	}{Province: "New York", City: "New York"},
+	}{Province: "Jawa Barat", City: "Bandung"},
 	}
 
-	result, err := Map(mock)
+	result, err := StructConvMap(mock)
 	if err != nil {
 		t.Fatal(err)
 	}
