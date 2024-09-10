@@ -7,7 +7,6 @@ import (
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport/http/response"
-	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -51,10 +50,6 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		token, header, err := config.Validate(c)
 		if err != nil {
 			log.Errorf("unauthorized: failed to validate auth: %v", err)
-			if errors.As(err, gorm.ErrRecordNotFound) {
-				response.GinJSONError(c, ErrNotLoggedIn)
-				return
-			}
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
@@ -65,7 +60,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		}
 		if token == nil {
 			log.Errorf("unauthorized: token is nil")
-			response.GinJSONError(c, ErrUnauthorized)
+			response.GinJSONError(c, ErrNotLoggedIn)
 			return
 		}
 
