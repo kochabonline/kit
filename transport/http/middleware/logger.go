@@ -19,7 +19,7 @@ type LoggerConfig struct {
 }
 
 type LoggerOption struct {
-	Filter func(c *gin.Context) bool
+	Filter func(c *gin.Context)
 }
 
 func GinLogger() gin.HandlerFunc {
@@ -55,7 +55,10 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 		if config.HeaderEnabled {
 			params = append(params, "headers", c.Request.Header)
 		}
-		if config.BodyEnabled && config.Option.Filter != nil && config.Option.Filter(c) {
+		if config.BodyEnabled {
+			if config.Option.Filter != nil {
+				config.Option.Filter(c)
+			}
 			body, _ := c.GetRawData()
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 			params = append(params, "body", string(body))
