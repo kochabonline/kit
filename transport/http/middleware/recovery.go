@@ -12,19 +12,17 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
-type GinRecoveryConfig struct {
-	Stack  bool
-	Logger *log.Helper
+type RecoveryConfig struct {
+	Stack bool
 }
 
 func GinRecovery() gin.HandlerFunc {
-	return GinRecoveryWithConfig(GinRecoveryConfig{
-		Stack:  true,
-		Logger: log.DefaultLogger,
+	return GinRecoveryWithConfig(RecoveryConfig{
+		Stack: true,
 	})
 }
 
-func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
+func GinRecoveryWithConfig(config RecoveryConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -34,8 +32,7 @@ func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
 				brokenPipe := isBrokenPipe(err)
 
 				if brokenPipe {
-					config.Logger.Error(
-						"recover from broken pipe",
+					log.Errorw(
 						"request", string(httpRequest),
 						"errors", err,
 					)
@@ -46,15 +43,13 @@ func GinRecoveryWithConfig(config GinRecoveryConfig) gin.HandlerFunc {
 				}
 
 				if config.Stack {
-					config.Logger.Error(
-						"recover from panic",
+					log.Errorw(
 						"request", string(httpRequest),
 						"errors", err,
 						"stack", string(debug.Stack()),
 					)
 				} else {
-					config.Logger.Error(
-						"recover from panic",
+					log.Errorw(
 						"request", string(httpRequest),
 						"errors", err,
 					)

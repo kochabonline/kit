@@ -10,12 +10,12 @@ import (
 )
 
 type LoggerConfig struct {
-	Logger *log.Helper
-
+	// Enable logging of request headers
 	HeaderEnabled    bool
 	BodyEnabled      bool
 	UserAgentEnabled bool
-	Option           LoggerOption
+
+	Option LoggerOption
 }
 
 type LoggerOption struct {
@@ -23,24 +23,29 @@ type LoggerOption struct {
 }
 
 func GinLogger() gin.HandlerFunc {
-	config := LoggerConfig{
-		Logger: log.NewHelper(log.DefaultLogger),
-	}
-
-	return GinLoggerWithConfig(config)
+	return GinLoggerWithConfig(LoggerConfig{})
 }
 
 func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if config.Logger == nil {
-			config.Logger = log.NewHelper(log.DefaultLogger)
+		if config.Option.Filter != nil {
+			config.Option.Filter(c)
+		}
+
+		// Pre-allocate slices to avoid dynamic expansion
+		params := make([]any, 0, 10)
+		// Reading the request body must be done before c.Next(), otherwise the body will be cleared
+		if config.BodyEnabled {
+			// After reading, write it back to the request body
+			body, _ := c.GetRawData()
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+			params = append(params, "body", string(body))
 		}
 
 		start := time.Now()
 		c.Next()
 		cost := time.Since(start)
 
-		params := make([]any, 0, 10)
 		params = append(params,
 			"method", c.Request.Method,
 			"uri", c.Request.RequestURI,
@@ -55,14 +60,6 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 		if config.HeaderEnabled {
 			params = append(params, "headers", c.Request.Header)
 		}
-		if config.BodyEnabled {
-			if config.Option.Filter != nil {
-				config.Option.Filter(c)
-			}
-			body, _ := c.GetRawData()
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
-			params = append(params, "body", string(body))
-		}
 		if config.UserAgentEnabled {
 			params = append(params, "user_agent", c.Request.UserAgent())
 		}
@@ -71,6 +68,6 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		config.Logger.Infow(params...)
+		log.Infow(params...)
 	}
 }

@@ -17,8 +17,9 @@ const (
 )
 
 var (
-	ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
-	ErrNotLoggedIn  = errors.BadRequest("unauthorized", "not logged in")
+	ErrUnauthorized   = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
+	ErrHeaderNotFound = errors.BadRequest("missing header", "auth middleware failed to authorize request")
+	ErrNotLoggedIn    = errors.BadRequest("not logged in", "auth middleware failed to authorize request")
 )
 
 type AuthConfig struct {
@@ -44,28 +45,28 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		authHeader := c.GetHeader(config.AuthHeader)
 		if authHeader == "" {
 			log.Errorf("unauthorized: missing auth header: %s", config.AuthHeader)
-			response.GinJSONError(c, ErrUnauthorized)
+			response.GinJSONError(c, ErrHeaderNotFound)
 			return
 		}
 
-		token, header, err := config.Validate(c)
+		token, id, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorf("unauthorized: not logged in: %v", err)
+				log.Errorf("unauthorized: %s not logged in: %v", id, err)
 				response.GinJSONError(c, ErrNotLoggedIn)
 				return
 			}
-			log.Errorf("unauthorized: failed to validate auth: %v", err)
+			log.Errorf("unauthorized: %s failed to validate auth: %v", id, err)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
-		if authHeader != header {
-			log.Errorf("unauthorized: not match header, expected: %s, got: %s", header, authHeader)
+		if authHeader != id {
+			log.Errorf("unauthorized: not match header, expected: %s, got: %s", id, authHeader)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
 		if token == nil {
-			log.Errorf("unauthorized: not logged in: token is nil")
+			log.Errorf("unauthorized: %s not logged in: token is nil", id)
 			response.GinJSONError(c, ErrNotLoggedIn)
 			return
 		}

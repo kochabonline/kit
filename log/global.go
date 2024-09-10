@@ -41,7 +41,7 @@ func Debugf(format string, args ...any) {
 	global.Log(level.Debug, defaultMsgKey, fmt.Sprintf(format, args...))
 }
 
-func Debugw(msg string, keyvals ...any) {
+func Debugw(keyvals ...any) {
 	global.Log(level.Debug, keyvals...)
 }
 
@@ -53,7 +53,7 @@ func Infof(format string, args ...any) {
 	global.Log(level.Info, defaultMsgKey, fmt.Sprintf(format, args...))
 }
 
-func Infow(msg string, keyvals ...any) {
+func Infow(keyvals ...any) {
 	global.Log(level.Info, keyvals...)
 }
 
@@ -65,7 +65,7 @@ func Warnf(format string, args ...any) {
 	global.Log(level.Warn, defaultMsgKey, fmt.Sprintf(format, args...))
 }
 
-func Warnw(msg string, keyvals ...any) {
+func Warnw(keyvals ...any) {
 	global.Log(level.Warn, keyvals...)
 }
 
@@ -77,7 +77,7 @@ func Errorf(format string, args ...any) {
 	global.Log(level.Error, defaultMsgKey, fmt.Sprintf(format, args...))
 }
 
-func Errorw(msg string, keyvals ...any) {
+func Errorw(keyvals ...any) {
 	global.Log(level.Error, keyvals...)
 }
 
@@ -91,7 +91,7 @@ func Fatalf(format string, args ...any) {
 	os.Exit(1)
 }
 
-func Fatalw(msg string, keyvals ...any) {
+func Fatalw(keyvals ...any) {
 	global.Log(level.Fatal, keyvals...)
 	os.Exit(1)
 }
