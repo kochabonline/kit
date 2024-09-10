@@ -39,20 +39,24 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 
 		authHeader := c.GetHeader(config.AuthHeader)
 		if authHeader == "" {
-			log.Error("unauthorized", "authHeader", authHeader, "request", c.Request)
+			log.Errorf("unauthorized: missing auth header: %s", config.AuthHeader)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
 
-		token, auth, err := config.Validate(c)
+		token, header, err := config.Validate(c)
 		if err != nil {
-			log.Error("unauthorized", "authHeader", authHeader, "request", c.Request, "error", err)
+			log.Errorf("unauthorized: failed to validate auth: %v", err)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
-
-		if authHeader != auth {
-			log.Error("unauthorized", "authHeader", authHeader, "auth", auth, "request", c.Request)
+		if authHeader != header {
+			log.Errorf("unauthorized: not match header, expected: %s, got: %s", header, authHeader)
+			response.GinJSONError(c, ErrUnauthorized)
+			return
+		}
+		if token == nil {
+			log.Errorf("unauthorized: token is nil")
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
