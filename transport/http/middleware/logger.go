@@ -1,23 +1,44 @@
 package middleware
 
 import (
+	"bytes"
+	"io"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/log"
 )
 
-type GinLoggerConfig struct {
-	Logger *log.Helper
+type LoggerConfig struct {
+	Logger           *log.Helper
+	HeaderEnabled    bool
+	BodyEnabled      bool
+	UserAgentEnabled bool
+	Option           LoggerOption
 }
 
-func GinLogger() gin.HandlerFunc {
-	return GinLoggerWithConfig(GinLoggerConfig{
-		Logger: log.DefaultLogger,
-	})
+type LoggerOption struct {
+	Filter func(c *gin.Context) bool
 }
 
-func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
+func WithLoggerFilter(filter func(c *gin.Context) bool) func(*LoggerOption) {
+	return func(option *LoggerOption) {
+		option.Filter = filter
+	}
+}
+
+func GinLogger(opts ...func(*LoggerOption)) gin.HandlerFunc {
+	config := LoggerConfig{
+		Logger: log.NewHelper(log.DefaultLogger),
+	}
+	for _, opt := range opts {
+		opt(&config.Option)
+	}
+
+	return GinLoggerWithConfig(config)
+}
+
+func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
@@ -34,6 +55,17 @@ func GinLoggerWithConfig(config GinLoggerConfig) gin.HandlerFunc {
 
 		if requestId := c.Request.Header.Get("X-Request-Id"); requestId != "" {
 			params = append(params, "request_id", requestId)
+		}
+		if config.HeaderEnabled {
+			params = append(params, "headers", c.Request.Header)
+		}
+		if config.BodyEnabled && config.Option.Filter != nil && config.Option.Filter(c) {
+			body, _ := c.GetRawData()
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+			params = append(params, "body", string(body))
+		}
+		if config.UserAgentEnabled {
+			params = append(params, "user_agent", c.Request.UserAgent())
 		}
 
 		if len(c.Errors) > 0 {
