@@ -49,24 +49,24 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		token, id, err := config.Validate(c)
+		token, header, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorf("unauthorized: %s not logged in: %v", id, err)
+				log.Errorf("unauthorized: %s not logged in: %v", authHeader, err)
 				response.GinJSONError(c, ErrNotLoggedIn)
 				return
 			}
-			log.Errorf("unauthorized: %s failed to validate auth: %v", id, err)
+			log.Errorf("unauthorized: %s failed to validate auth: %v", authHeader, err)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
-		if authHeader != id {
-			log.Errorf("unauthorized: not match header, expected: %s, got: %s", id, authHeader)
+		if authHeader != header {
+			log.Errorf("unauthorized: not match header, expected: %s, got: %s", header, authHeader)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
 		if token == nil {
-			log.Errorf("unauthorized: %s not logged in: token is nil", id)
+			log.Errorf("unauthorized: %s not logged in: token is nil", authHeader)
 			response.GinJSONError(c, ErrNotLoggedIn)
 			return
 		}
