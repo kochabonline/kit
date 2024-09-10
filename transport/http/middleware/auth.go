@@ -18,7 +18,7 @@ const (
 
 var (
 	ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
-	ErrNotLoggedIn  = errors.Unauthorized("unauthorized", "not logged in")
+	ErrNotLoggedIn  = errors.BadRequest("unauthorized", "not logged in")
 )
 
 type AuthConfig struct {
@@ -50,11 +50,12 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 
 		token, header, err := config.Validate(c)
 		if err != nil {
-			log.Errorf("unauthorized: failed to validate auth: %v", err)
 			if errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Errorf("unauthorized: not logged in: %v", err)
 				response.GinJSONError(c, ErrNotLoggedIn)
 				return
 			}
+			log.Errorf("unauthorized: failed to validate auth: %v", err)
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
@@ -64,7 +65,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 		if token == nil {
-			log.Errorf("unauthorized: token is nil")
+			log.Errorf("unauthorized: not logged in: token is nil")
 			response.GinJSONError(c, ErrNotLoggedIn)
 			return
 		}
