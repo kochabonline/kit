@@ -10,7 +10,8 @@ import (
 )
 
 type LoggerConfig struct {
-	Logger           *log.Helper
+	Logger *log.Helper
+
 	HeaderEnabled    bool
 	BodyEnabled      bool
 	UserAgentEnabled bool
@@ -21,18 +22,9 @@ type LoggerOption struct {
 	Filter func(c *gin.Context) bool
 }
 
-func WithLoggerFilter(filter func(c *gin.Context) bool) func(*LoggerOption) {
-	return func(option *LoggerOption) {
-		option.Filter = filter
-	}
-}
-
-func GinLogger(opts ...func(*LoggerOption)) gin.HandlerFunc {
+func GinLogger() gin.HandlerFunc {
 	config := LoggerConfig{
 		Logger: log.NewHelper(log.DefaultLogger),
-	}
-	for _, opt := range opts {
-		opt(&config.Option)
 	}
 
 	return GinLoggerWithConfig(config)
@@ -40,6 +32,10 @@ func GinLogger(opts ...func(*LoggerOption)) gin.HandlerFunc {
 
 func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if config.Logger == nil {
+			config.Logger = log.NewHelper(log.DefaultLogger)
+		}
+
 		start := time.Now()
 		c.Next()
 		cost := time.Since(start)
