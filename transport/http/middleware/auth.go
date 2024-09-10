@@ -7,6 +7,7 @@ import (
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport/http/response"
+	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -15,7 +16,10 @@ const (
 	Token = contextKey("token")
 )
 
-var ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
+var (
+	ErrUnauthorized = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
+	ErrNotLoggedIn  = errors.Unauthorized("unauthorized", "not logged in")
+)
 
 type AuthConfig struct {
 	// AuthHeader is the header key to look for the auth value
@@ -47,6 +51,10 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		token, header, err := config.Validate(c)
 		if err != nil {
 			log.Errorf("unauthorized: failed to validate auth: %v", err)
+			if errors.As(err, gorm.ErrRecordNotFound) {
+				response.GinJSONError(c, ErrNotLoggedIn)
+				return
+			}
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
