@@ -10,8 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type contextKey string
-
 const (
 	Token = "token"
 )
@@ -28,7 +26,7 @@ type AuthConfig struct {
 	// Validate is a function that takes a gin context and returns the auth value
 	// The contents in the map will be put into the context
 	// The fields that must be included are: userId, header, token
-	Validate func(c *gin.Context) (map[string]any, error)
+	Validate func(c *gin.Context) (map[any]any, error)
 	// SkippedPathPrefixes is a list of path prefixes that should be skipped from auth
 	SkippedPathPrefixes []string
 }
@@ -77,7 +75,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		// Set the token in the context
 		ctx := c.Request.Context()
 		for k, v := range result {
-			ctx = context.WithValue(ctx, contextKey(k), v)
+			ctx = context.WithValue(ctx, k, v)
 		}
 		c.Request = c.Request.WithContext(ctx)
 
