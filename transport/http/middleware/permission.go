@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
@@ -15,9 +17,9 @@ type PermissionConfig struct {
 	// Param is the param key to look for the id value
 	Param string
 	// Validate is a function that takes a gin context and returns the auth value
-	Validate func(c *gin.Context) (id string, role string, err error)
+	Validate func(c *gin.Context) (id int64, role int, err error)
 	// SkippedRoles is a list of roles that should be skipped from permission
-	SkippedRoles []string
+	SkippedRole int
 }
 
 func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
@@ -34,16 +36,20 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 			return
 		}
 
-		for _, skippedRole := range config.SkippedRoles {
-			if role == skippedRole {
-				c.Next()
-				return
-			}
+		if role >= config.SkippedRole {
+			c.Next()
+			return
 		}
 
 		paramValue := c.Param(config.Param)
-		if paramValue != "" && paramValue != id {
-			log.Errorf("permission denied access to %s for %s", paramValue, id)
+		if paramValue == "" {
+			c.Next()
+			return
+		}
+
+		idStr := strconv.FormatInt(id, 10)
+		if paramValue != idStr {
+			log.Errorf("permission failed to authorize: %s != %s", paramValue, idStr)
 			response.GinJSONError(c, ErrPermissionUnauthorized)
 			return
 		}
