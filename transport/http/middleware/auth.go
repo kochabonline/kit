@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
@@ -72,9 +73,13 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		// Set the token in the context
+		// with context
 		ctx := c.Request.Context()
 		for k, v := range result {
+			// The value in the context must be a stringer type, if not, convert it to a string
+			if _, ok := v.(fmt.Stringer); !ok {
+				v = fmt.Sprintf("%v", v)
+			}
 			ctx = context.WithValue(ctx, k, v)
 		}
 		c.Request = c.Request.WithContext(ctx)
