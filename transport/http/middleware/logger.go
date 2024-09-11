@@ -11,9 +11,9 @@ import (
 
 type LoggerConfig struct {
 	// Enable logging of request headers
-	HeaderEnabled    bool
-	BodyEnabled      bool
-	UserAgentEnabled bool
+	HeaderEnabled  bool
+	BodyEnabled    bool
+	HandlerEnabled bool
 
 	Option LoggerOption
 }
@@ -60,8 +60,8 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 		if config.HeaderEnabled {
 			params = append(params, "headers", c.Request.Header)
 		}
-		if config.UserAgentEnabled {
-			params = append(params, "user_agent", c.Request.UserAgent())
+		if config.HandlerEnabled {
+			params = append(params, "handler", c.HandlerName())
 		}
 
 		if len(c.Errors) > 0 {

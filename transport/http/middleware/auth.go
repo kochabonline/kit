@@ -13,7 +13,7 @@ import (
 type contextKey string
 
 const (
-	Token = contextKey("token")
+	Token = "token"
 )
 
 var (
@@ -26,7 +26,9 @@ type AuthConfig struct {
 	// AuthHeader is the header key to look for the auth value
 	AuthHeader string
 	// Validate is a function that takes a gin context and returns the auth value
-	Validate func(c *gin.Context) (any, string, error)
+	// The contents in the map will be put into the context
+	// The fields that must be included are: userId, header, token
+	Validate func(c *gin.Context) (map[string]any, error)
 	// SkippedPathPrefixes is a list of path prefixes that should be skipped from auth
 	SkippedPathPrefixes []string
 }
@@ -49,7 +51,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		token, header, err := config.Validate(c)
+		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				log.Errorf("unauthorized: %s not logged in: %v", authHeader, err)
@@ -60,6 +62,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			response.GinJSONError(c, ErrUnauthorized)
 			return
 		}
+		header, token := result[config.AuthHeader], result[Token]
 		if authHeader != header {
 			log.Errorf("unauthorized: not match header, expected: %s, got: %s", header, authHeader)
 			response.GinJSONError(c, ErrUnauthorized)
@@ -72,7 +75,10 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		}
 
 		// Set the token in the context
-		ctx := context.WithValue(c.Request.Context(), Token, token)
+		ctx := c.Request.Context()
+		for k, v := range result {
+			ctx = context.WithValue(ctx, contextKey(k), v)
+		}
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
