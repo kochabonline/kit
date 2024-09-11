@@ -29,6 +29,12 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 			return
 		}
 
+		paramValue := c.Param(config.Param)
+		if paramValue == "" {
+			c.Next()
+			return
+		}
+
 		id, role, err := config.Validate(c)
 		if err != nil {
 			log.Errorf("permission failed to validate: %v", err)
@@ -37,12 +43,6 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 		}
 
 		if role >= config.SkippedRole {
-			c.Next()
-			return
-		}
-
-		paramValue := c.Param(config.Param)
-		if paramValue == "" {
 			c.Next()
 			return
 		}
