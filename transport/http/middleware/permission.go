@@ -14,8 +14,6 @@ var (
 type PermissionConfig struct {
 	// Param is the param key to look for the id value
 	Param string
-	// Role is the key to look for the role value
-	Role string
 	// Validate is a function that takes a gin context and returns the auth value
 	Validate func(c *gin.Context) (id string, role string, err error)
 	// SkippedRoles is a list of roles that should be skipped from permission
@@ -24,7 +22,7 @@ type PermissionConfig struct {
 
 func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if config.Validate == nil || config.Param == "" || config.Role == "" {
+		if config.Validate == nil || config.Param == "" {
 			c.Next()
 			return
 		}
