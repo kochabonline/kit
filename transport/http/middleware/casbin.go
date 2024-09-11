@@ -19,6 +19,10 @@ type CasbinConfig struct {
 
 func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if config.E == nil || config.Sub == nil {
+			c.Next()
+			return
+		}
 		path := c.Request.URL.Path
 		method := c.Request.Method
 		sub, err := config.Sub(c)
