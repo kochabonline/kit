@@ -23,6 +23,7 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 			c.Next()
 			return
 		}
+
 		path := c.Request.URL.Path
 		method := c.Request.Method
 		sub, err := config.Sub(c)

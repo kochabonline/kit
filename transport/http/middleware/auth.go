@@ -15,10 +15,9 @@ const (
 )
 
 var (
-	ErrAuthHeaderNotFound = errors.BadRequest("missing header", "auth middleware failed to authorize request")
-	ErrAuthNotLoggedIn    = errors.BadRequest("not logged in", "auth middleware failed to authorize request")
-	ErrAuthUnauthorized   = errors.Unauthorized("unauthorized", "auth middleware failed to authorize request")
-	ErrAuthForbidden      = errors.Forbidden("permission denied", "auth middleware failed to authorize request")
+	ErrAuthHeaderNotFound  = errors.Unauthorized("missing auth header", "auth header not found")
+	ErrorAuthHeaderInvalid = errors.Unauthorized("invalid auth header", "auth header is invalid")
+	ErrAuthTokenNotFound   = errors.Unauthorized("missing token", "token not found")
 )
 
 type AuthConfig struct {
@@ -36,18 +35,19 @@ type AuthConfig struct {
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
+	if config.Token == "" {
+		config.Token = defaultToken
+	}
+
 	return func(c *gin.Context) {
 		if config.Validate == nil || skippedPathPrefixes(c, config.SkippedPathPrefixes...) {
 			c.Next()
 			return
 		}
-		if config.Token == "" {
-			config.Token = defaultToken
-		}
 
 		authHeader := c.GetHeader(config.AuthHeader)
 		if authHeader == "" {
-			log.Errorw("user", authHeader, "error", ErrAuthHeaderNotFound)
+			log.Errorw("error", errors.Unauthorized("missing auth header", "header %s not found", config.AuthHeader))
 			response.GinJSONError(c, ErrAuthHeaderNotFound)
 			return
 		}
@@ -55,23 +55,23 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorw("user", authHeader, "error", ErrAuthUnauthorized)
-				response.GinJSONError(c, ErrAuthUnauthorized)
+				log.Errorw("user", authHeader, "error", ErrAuthTokenNotFound)
+				response.GinJSONError(c, ErrAuthTokenNotFound)
 				return
 			}
 			log.Errorw("user", authHeader, "error", err)
-			response.GinJSONError(c, ErrAuthUnauthorized)
+			response.GinJSONError(c, err)
 			return
 		}
 		header, token := result[config.AuthHeader], result[config.Token]
 		if authHeader != header {
-			log.Errorw("user", authHeader, "error", ErrAuthUnauthorized)
-			response.GinJSONError(c, ErrAuthUnauthorized)
+			log.Errorw("user", authHeader, "error", errors.Unauthorized("invalid auth header", "expected %s, got %s", header, authHeader))
+			response.GinJSONError(c, ErrorAuthHeaderInvalid)
 			return
 		}
 		if token == nil {
-			log.Errorw("user", header, "error", ErrAuthNotLoggedIn)
-			response.GinJSONError(c, ErrAuthNotLoggedIn)
+			log.Errorw("user", authHeader, "error", ErrAuthTokenNotFound)
+			response.GinJSONError(c, ErrAuthTokenNotFound)
 			return
 		}
 
