@@ -24,7 +24,7 @@ var (
 type AuthConfig struct {
 	// AuthHeader is the header key to look for the auth value
 	AuthHeader string
-	// TokenName is the header key to look for the auth value
+	// Token is the header key to look for the auth value
 	Token string
 	// Validate is a function that takes a gin context and returns the auth value
 	// The contents in the map will be put into the context
@@ -47,7 +47,7 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 
 		authHeader := c.GetHeader(config.AuthHeader)
 		if authHeader == "" {
-			log.Errorf("unauthorized: missing auth header: %s", config.AuthHeader)
+			log.Errorw("user", authHeader, "error", ErrAuthHeaderNotFound)
 			response.GinJSONError(c, ErrAuthHeaderNotFound)
 			return
 		}
@@ -55,22 +55,22 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorf("unauthorized: %s not logged in: %v", authHeader, err)
-				response.GinJSONError(c, ErrAuthNotLoggedIn)
+				log.Errorw("user", authHeader, "error", ErrAuthUnauthorized)
+				response.GinJSONError(c, ErrAuthUnauthorized)
 				return
 			}
-			log.Errorf("unauthorized: %s failed to validate auth: %v", authHeader, err)
+			log.Errorw("user", authHeader, "error", err)
 			response.GinJSONError(c, ErrAuthUnauthorized)
 			return
 		}
 		header, token := result[config.AuthHeader], result[config.Token]
 		if authHeader != header {
-			log.Errorf("unauthorized: not match header, expected: %s, got: %s", header, authHeader)
+			log.Errorw("user", authHeader, "error", ErrAuthUnauthorized)
 			response.GinJSONError(c, ErrAuthUnauthorized)
 			return
 		}
 		if token == nil {
-			log.Errorf("unauthorized: %s not logged in: token is nil", authHeader)
+			log.Errorw("user", header, "error", ErrAuthNotLoggedIn)
 			response.GinJSONError(c, ErrAuthNotLoggedIn)
 			return
 		}

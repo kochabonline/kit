@@ -5,25 +5,25 @@ import (
 )
 
 type MapConfig struct {
-	Tag       string
-	SkipEmpty bool
+	tag       string
+	skipEmpty bool
 }
 
 func WithMapTag(tag string) func(*MapConfig) {
 	return func(c *MapConfig) {
-		c.Tag = tag
+		c.tag = tag
 	}
 }
 
 func WithMapSkipEmpty() func(*MapConfig) {
 	return func(c *MapConfig) {
-		c.SkipEmpty = true
+		c.skipEmpty = true
 	}
 }
 
 func StructConvMap(target any, opts ...func(*MapConfig)) (map[string]any, error) {
 	config := &MapConfig{
-		Tag: "json",
+		tag: "json",
 	}
 	for _, opt := range opts {
 		opt(config)
@@ -38,13 +38,13 @@ func StructConvMap(target any, opts ...func(*MapConfig)) (map[string]any, error)
 	result := make(map[string]any, typeOf.NumField())
 	for i := 0; i < typeOf.NumField(); i++ {
 		field := typeOf.Field(i)
-		tag := field.Tag.Get(config.Tag)
+		tag := field.Tag.Get(config.tag)
 		if tag == "" {
 			tag = field.Name
 		}
 
 		value := valueOf.Field(i)
-		if value.IsZero() && config.SkipEmpty {
+		if value.IsZero() && config.skipEmpty {
 			continue
 		}
 

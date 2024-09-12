@@ -8,12 +8,12 @@ import (
 )
 
 type TagConfig struct {
-	Tag string
+	tag string
 }
 
 func WithTagTag(tag string) func(*TagConfig) {
 	return func(c *TagConfig) {
-		c.Tag = tag
+		c.tag = tag
 	}
 }
 
@@ -38,7 +38,7 @@ func SetDefaultTag(target any, opts ...func(*TagConfig)) error {
 	}
 
 	config := &TagConfig{
-		Tag: "default",
+		tag: "default",
 	}
 	for _, opt := range opts {
 		opt(config)
@@ -46,7 +46,7 @@ func SetDefaultTag(target any, opts ...func(*TagConfig)) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		tag := field.Tag.Get(config.Tag)
+		tag := field.Tag.Get(config.tag)
 		// Even if the default tag value is empty, as long as it is a struct type,
 		// the default value needs to be set recursively
 		if tag == "" && field.Type.Kind() != reflect.Struct {
