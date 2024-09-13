@@ -37,7 +37,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		id, role, err := config.Validate(c)
 		if err != nil {
-			log.Errorf("permission failed to validate: %v", err)
+			log.Errorw("user", id, "error", errors.Forbidden("permission denied", "permission failed to validate: %v", err))
 			response.GinJSONError(c, ErrPermissionUnauthorized)
 			return
 		}
@@ -49,7 +49,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		idStr := strconv.FormatInt(id, 10)
 		if paramValue != idStr {
-			log.Errorf("permission failed to authorize: %s != %s", paramValue, idStr)
+			log.Errorw("user", id, "error", errors.Forbidden("permission denied", "%s is not allowed to access %s", idStr, paramValue))
 			response.GinJSONError(c, ErrPermissionUnauthorized)
 			return
 		}
