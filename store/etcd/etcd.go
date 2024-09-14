@@ -13,17 +13,17 @@ type Etcd struct {
 type Option func(*Etcd)
 
 func New(c *Config, opts ...Option) (*Etcd, error) {
-	if err := c.initConfig(); err != nil {
-		return nil, err
-	}
+	e := &Etcd{}
 
-	m := &Etcd{}
+	if err := c.initConfig(); err != nil {
+		return e, err
+	}
 
 	for _, opt := range opts {
-		opt(m)
+		opt(e)
 	}
 
-	return m.new(c)
+	return e.new(c)
 }
 
 func (e *Etcd) new(c *Config) (*Etcd, error) {

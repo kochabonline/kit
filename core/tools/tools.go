@@ -1,8 +1,10 @@
 package tools
 
 import (
+	"math/rand"
 	"net"
 	"os"
+	"time"
 
 	"strings"
 
@@ -32,4 +34,15 @@ func Hostname() string {
 	}
 
 	return hostname
+}
+
+func GenerateRandomCode(length int) string {
+	source := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(source)
+	digits := "0123456789"
+	code := make([]byte, length)
+	for i := range code {
+		code[i] = digits[r.Intn(len(digits))]
+	}
+	return string(code)
 }

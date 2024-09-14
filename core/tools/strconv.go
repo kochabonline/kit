@@ -17,7 +17,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.Atoi(v)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(i).(T))
 		}
@@ -25,7 +25,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseInt(v, 10, 8)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(int8(i)).(T))
 		}
@@ -33,7 +33,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseInt(v, 10, 16)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(int16(i)).(T))
 		}
@@ -41,7 +41,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseInt(v, 10, 32)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(int32(i)).(T))
 		}
@@ -49,7 +49,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(i).(T))
 		}
@@ -57,7 +57,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseUint(v, 10, 0)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(uint(i)).(T))
 		}
@@ -65,7 +65,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseUint(v, 10, 8)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(uint8(i)).(T))
 		}
@@ -73,7 +73,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseUint(v, 10, 16)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(uint16(i)).(T))
 		}
@@ -81,7 +81,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseUint(v, 10, 32)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(uint32(i)).(T))
 		}
@@ -89,7 +89,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			i, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(i).(T))
 		}
@@ -97,7 +97,7 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			f, err := strconv.ParseFloat(v, 32)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(float32(f)).(T))
 		}
@@ -105,12 +105,12 @@ func Strconv[T any](s ...string) ([]T, error) {
 		for _, v := range s {
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return nil, err
+				return []T{}, err
 			}
 			result = append(result, any(f).(T))
 		}
 	default:
-		return nil, errors.New("unsupported type")
+		return []T{}, errors.New("unsupported type")
 	}
 
 	return result, nil

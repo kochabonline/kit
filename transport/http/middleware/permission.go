@@ -5,12 +5,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
-	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/transport/http/response"
 )
 
 var (
-	ErrPermissionUnauthorized = errors.Forbidden("permission denied", "permission middleware failed to authorize request")
+	ErrPermissionForbiddenReason = "permission denied"
 )
 
 type PermissionConfig struct {
@@ -37,8 +35,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		id, role, err := config.Validate(c)
 		if err != nil {
-			log.Errorw("user", id, "error", errors.Forbidden("permission denied", "permission failed to validate: %v", err))
-			response.GinJSONError(c, ErrPermissionUnauthorized)
+			handleError(c, strconv.FormatInt(id, 10), errors.Forbidden(ErrPermissionForbiddenReason, "permission failed to validate: %v", err))
 			return
 		}
 
@@ -49,8 +46,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		idStr := strconv.FormatInt(id, 10)
 		if paramValue != idStr {
-			log.Errorw("user", id, "error", errors.Forbidden("permission denied", "%s is not allowed to access %s", idStr, paramValue))
-			response.GinJSONError(c, ErrPermissionUnauthorized)
+			handleError(c, idStr, errors.Forbidden(ErrPermissionForbiddenReason, "%s is not allowed to access %s", idStr, paramValue))
 			return
 		}
 

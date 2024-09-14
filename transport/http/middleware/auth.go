@@ -5,8 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
-	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/transport/http/response"
 	"gorm.io/gorm"
 )
 
@@ -14,10 +12,11 @@ const (
 	defaultToken = "token"
 )
 
-var (
-	ErrAuthHeaderNotFound  = errors.Unauthorized("missing auth header", "auth header not found")
-	ErrorAuthHeaderInvalid = errors.Unauthorized("invalid auth header", "auth header is invalid")
-	ErrAuthTokenNotFound   = errors.Unauthorized("missing token", "token not found")
+const (
+	ErrAuthHeaderMissingReason = "missing auth header"
+	ErrAuthHeaderInvalidReason = "invalid auth header"
+	ErrAuthTokenMissingReason  = "missing token"
+	ErrAuthTokenInvalidReason  = "invalid token"
 )
 
 type AuthConfig struct {
@@ -47,31 +46,26 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 
 		authHeader := c.GetHeader(config.AuthHeader)
 		if authHeader == "" {
-			log.Errorw("error", errors.Unauthorized("missing auth header", "header %s not found", config.AuthHeader))
-			response.GinJSONError(c, ErrAuthHeaderNotFound)
+			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderMissingReason, "header %s not found", config.AuthHeader))
 			return
 		}
 
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorw("user", authHeader, "error", ErrAuthTokenNotFound)
-				response.GinJSONError(c, ErrAuthTokenNotFound)
+				handleError(c, authHeader, errors.Unauthorized(ErrAuthTokenMissingReason, "token not found"))
 				return
 			}
-			log.Errorw("user", authHeader, "error", err)
-			response.GinJSONError(c, err)
+			handleError(c, authHeader, errors.Unauthorized(ErrAuthTokenInvalidReason, "error validating token: %v", err))
 			return
 		}
 		header, token := result[config.AuthHeader], result[config.Token]
 		if authHeader != header {
-			log.Errorw("user", authHeader, "error", errors.Unauthorized("invalid auth header", "expected %s, got %s", header, authHeader))
-			response.GinJSONError(c, ErrorAuthHeaderInvalid)
+			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderInvalidReason, "expected %s, got %s", header, authHeader))
 			return
 		}
 		if token == nil {
-			log.Errorw("user", authHeader, "error", ErrAuthTokenNotFound)
-			response.GinJSONError(c, ErrAuthTokenNotFound)
+			handleError(c, authHeader, errors.Unauthorized(ErrAuthTokenMissingReason, "token not found"))
 			return
 		}
 

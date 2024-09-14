@@ -40,34 +40,34 @@ type GoogleAuthenticator struct {
 	QrApi        string `json:"qr_api"`
 }
 
-type Options func(*GoogleAuthenticator)
+type Option func(*GoogleAuthenticator)
 
-func WithSecretSize(secretSize int) Options {
+func WithSecretSize(secretSize int) Option {
 	return func(ga *GoogleAuthenticator) {
 		ga.SecretSize = secretSize
 	}
 }
 
-func WithExpireSecond(expireSecond int) Options {
+func WithExpireSecond(expireSecond int) Option {
 	return func(ga *GoogleAuthenticator) {
 		ga.ExpireSecond = expireSecond
 	}
 }
 
-func WithDigits(digits int) Options {
+func WithDigits(digits int) Option {
 	return func(ga *GoogleAuthenticator) {
 		ga.Digits = digits
 	}
 }
 
-func WithQrApi(qrApi string) Options {
+func WithQrApi(qrApi string) Option {
 	return func(ga *GoogleAuthenticator) {
 		ga.QrApi = qrApi
 	}
 }
 
 // NewGoogleAuthenticator creates a new GoogleAuthenticator
-func NewGoogleAuthenticator(Opt ...Options) GoogleAuthenticatorer {
+func NewGoogleAuthenticator(Opt ...Option) GoogleAuthenticatorer {
 	ga := &GoogleAuthenticator{
 		SecretSize:   16,
 		ExpireSecond: 30,

@@ -15,11 +15,11 @@ type Mysql struct {
 type Option func(*Mysql)
 
 func New(c *Config, opts ...Option) (*Mysql, error) {
-	if err := c.initConfig(); err != nil {
-		return nil, err
-	}
-
 	m := &Mysql{}
+
+	if err := c.initConfig(); err != nil {
+		return m, err
+	}
 
 	for _, opt := range opts {
 		opt(m)

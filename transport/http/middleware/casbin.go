@@ -4,17 +4,15 @@ import (
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
-	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/transport/http/response"
 )
 
 var (
-	ErrCasbinUnauthorized = errors.Forbidden("permission denied", "casbin middleware failed to authorize request")
+	ErrCasbinForbiddenReason = "permission denied"
 )
 
 type CasbinConfig struct {
 	E   *casbin.SyncedCachedEnforcer
-	Sub func(c *gin.Context) (string, error)
+	Sub func(c *gin.Context) (user string, role string, err error)
 }
 
 func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
@@ -26,21 +24,18 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 
 		path := c.Request.URL.Path
 		method := c.Request.Method
-		sub, err := config.Sub(c)
+		user, sub, err := config.Sub(c)
 		if err != nil {
-			log.Errorf("casbin failed to get subject: %v", err)
-			response.GinJSONError(c, ErrCasbinUnauthorized)
+			handleError(c, user, errors.Forbidden(ErrCasbinForbiddenReason, "casbin failed to get subject: %v", err))
 			return
 		}
 		ok, err := config.E.Enforce(sub, path, method)
 		if err != nil {
-			log.Errorf("casbin failed to enforce: %v", err)
-			response.GinJSONError(c, ErrCasbinUnauthorized)
+			handleError(c, user, errors.Forbidden(ErrCasbinForbiddenReason, "casbin failed to enforce: %v", err))
 			return
 		}
 		if !ok {
-			log.Errorf("casbin denied access to %s %s for %s", method, path, sub)
-			response.GinJSONError(c, ErrCasbinUnauthorized)
+			handleError(c, user, errors.Forbidden(ErrCasbinForbiddenReason, "casbin denied access to %s %s for %s", method, path, sub))
 			return
 		}
 		c.Next()

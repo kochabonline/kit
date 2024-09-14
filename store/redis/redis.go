@@ -53,15 +53,18 @@ func (s *Single) Close() error {
 	if s.Client == nil {
 		return nil
 	}
-	
+
 	return s.Client.Close()
 }
 
 type ClusterOption func(*Cluster)
 
 func NewClusterClient(c *ClusterConfig, opts ...ClusterOption) (*Cluster, error) {
-	_ = c.initConfig()
 	cl := &Cluster{}
+
+	if err := c.initConfig(); err != nil {
+		return cl, err
+	}
 
 	for _, opt := range opts {
 		opt(cl)
