@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"net/http"
 	"testing"
 )
 
@@ -12,7 +13,7 @@ func TestHttp(t *testing.T) {
 	url := Url("http://localhost:8080", WithUrlRefs("health"))
 	var response Response
 	client := New()
-	err := client.Request("GET", url, nil, WithRequestResponse(&response))
+	err := client.Request(http.MethodGet, url, nil, WithRequestResponse(&response))
 	if err != nil {
 		t.Error(err)
 	}

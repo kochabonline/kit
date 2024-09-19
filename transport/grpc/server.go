@@ -18,8 +18,8 @@ const (
 )
 
 type Server struct {
-	server *grpc.Server
 	addr   string
+	server *grpc.Server
 	log    *log.Helper
 }
 
@@ -33,6 +33,7 @@ func WithLogger(logger *log.Helper) Option {
 
 func NewServer(addr string, opts ...Option) *Server {
 	s := &Server{
+		addr:   addr,
 		server: grpc.NewServer(),
 		log:    log.DefaultLogger,
 	}

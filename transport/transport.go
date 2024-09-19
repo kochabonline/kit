@@ -21,7 +21,6 @@ func ValidateAddress(addr string) bool {
 	if err != nil {
 		return false
 	}
-
 	if p < 1 || p > 65535 {
 		return false
 	}

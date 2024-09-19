@@ -18,8 +18,8 @@ var _ transport.Server = (*Server)(nil)
 
 const (
 	// DefaultAddr is the default address for the server.
-	defaultAddr = ":8080"
 	defaultName = "http"
+	defaultAddr = ":8080"
 )
 
 // Meta is the metadata of the server.
