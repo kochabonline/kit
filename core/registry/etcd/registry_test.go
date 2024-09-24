@@ -36,6 +36,6 @@ func TestRegistry(t *testing.T) {
 	instance := registry.Instance{Id: tools.Id(), Name: "test2", Endpoints: []string{"http://localhost:8080"}}
 	r.Register(context.Background(), instance)
 	time.Sleep(3 * time.Second)
-	r.Deregister(context.Background(), instance)
+	_ = r.Deregister(context.Background(), instance)
 	time.Sleep(30 * time.Second)
 }

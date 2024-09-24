@@ -13,7 +13,6 @@ var _ registry.Discoverer = (*Registry)(nil)
 
 type Registry struct {
 	client    *clientv3.Client
-	lease     clientv3.Lease
 	ttl       int64
 	namespace string
 }
@@ -35,7 +34,6 @@ func WithNamespace(namespace string) Option {
 func NewRegistry(client *clientv3.Client, opts ...Option) *Registry {
 	r := &Registry{
 		client:    client,
-		lease:     clientv3.NewLease(client),
 		ttl:       5,
 		namespace: "/services",
 	}
@@ -46,7 +44,7 @@ func NewRegistry(client *clientv3.Client, opts ...Option) *Registry {
 }
 
 func (r *Registry) Register(ctx context.Context, instance registry.Instance) error {
-	resp, err := r.lease.Grant(ctx, r.ttl)
+	resp, err := r.client.Grant(ctx, r.ttl)
 	if err != nil {
 		return err
 	}
@@ -66,15 +64,28 @@ func (r *Registry) Register(ctx context.Context, instance registry.Instance) err
 }
 
 func (r *Registry) Deregister(ctx context.Context, instance registry.Instance) error {
-	defer func() {
-		if r.client.Lease != nil {
-			r.client.Lease.Close()
-		}
-	}()
-
 	key := fmt.Sprintf("%s/%s/%s", r.namespace, instance.Name, instance.Id)
-	_, err := r.client.Delete(ctx, key)
-	return err
+	resp, err := r.client.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Kvs) == 0 {
+		return fmt.Errorf("instance not found: %v", instance)
+	}
+
+	leaseId := clientv3.LeaseID(resp.Kvs[0].Lease)
+	if leaseId != 0 {
+		if _, err := r.client.Revoke(ctx, leaseId); err != nil {
+			return err
+		}
+	}
+	_, err = r.client.Delete(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *Registry) keepAlive(ctx context.Context, id clientv3.LeaseID) error {
