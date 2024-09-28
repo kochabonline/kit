@@ -9,21 +9,17 @@ import (
 )
 
 const (
-	defaultToken = "token"
+	defaultAuthHeader = "token"
 )
 
 const (
 	ErrAuthHeaderMissingReason = "missing auth header"
 	ErrAuthHeaderInvalidReason = "invalid auth header"
-	ErrAuthTokenMissingReason  = "missing token"
-	ErrAuthTokenInvalidReason  = "invalid token"
 )
 
 type AuthConfig struct {
 	// AuthHeader is the header key to look for the auth value
 	AuthHeader string
-	// Token is the header key to look for the auth value
-	Token string
 	// Validate is a function that takes a gin context and returns the auth value
 	// The contents in the map will be put into the context
 	// The fields that must be included are: userId, header, token
@@ -34,8 +30,8 @@ type AuthConfig struct {
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
-	if config.Token == "" {
-		config.Token = defaultToken
+	if config.AuthHeader == "" {
+		config.AuthHeader = defaultAuthHeader
 	}
 
 	return func(c *gin.Context) {
@@ -53,19 +49,15 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				handleError(c, authHeader, errors.Unauthorized(ErrAuthTokenMissingReason, "token not found"))
+				handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
 				return
 			}
-			handleError(c, authHeader, errors.Unauthorized(ErrAuthTokenInvalidReason, "error validating token: %v", err))
+			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderInvalidReason, "error validating token: %v", err))
 			return
 		}
-		header, token := result[config.AuthHeader], result[config.Token]
-		if authHeader != header {
-			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderInvalidReason, "expected %s, got %s", header, authHeader))
-			return
-		}
-		if token == nil {
-			handleError(c, authHeader, errors.Unauthorized(ErrAuthTokenMissingReason, "token not found"))
+		header := result[config.AuthHeader]
+		if header == nil {
+			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
 			return
 		}
 

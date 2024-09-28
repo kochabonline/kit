@@ -11,9 +11,7 @@ import (
 )
 
 func TestRegistry(t *testing.T) {
-	e, err := etcd.New(&etcd.Config{
-		Password: "12345678",
-	})
+	e, err := etcd.New(&etcd.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
