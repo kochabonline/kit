@@ -7,6 +7,10 @@ import (
 	"github.com/kochabonline/kit/errors"
 )
 
+const (
+	defaultParam = "id"
+)
+
 var (
 	ErrPermissionForbiddenReason = "permission denied"
 )
@@ -21,8 +25,12 @@ type PermissionConfig struct {
 }
 
 func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
+	if config.Param == "" {
+		config.Param = defaultParam
+	}
+
 	return func(c *gin.Context) {
-		if config.Validate == nil || config.Param == "" {
+		if config.Validate == nil {
 			c.Next()
 			return
 		}

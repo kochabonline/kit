@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
+	"github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/transport/http/response"
 	"gorm.io/gorm"
 )
 
@@ -18,11 +20,11 @@ const (
 )
 
 type AuthConfig struct {
-	// AuthHeader is the header key to look for the auth value
-	AuthHeader string
+	// Header is the header key to look for the auth value
+	Header string
 	// Validate is a function that takes a gin context and returns the auth value
 	// The contents in the map will be put into the context
-	// The fields that must be included are: userId, header, token
+	// The fields that must be included are: userId, token
 	// struct{} or a type that implements the String() method
 	Validate func(c *gin.Context) (map[any]any, error)
 	// SkippedPathPrefixes is a list of path prefixes that should be skipped from auth
@@ -30,8 +32,8 @@ type AuthConfig struct {
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
-	if config.AuthHeader == "" {
-		config.AuthHeader = defaultAuthHeader
+	if config.Header == "" {
+		config.Header = defaultAuthHeader
 	}
 
 	return func(c *gin.Context) {
@@ -40,24 +42,21 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			return
 		}
 
-		authHeader := c.GetHeader(config.AuthHeader)
-		if authHeader == "" {
-			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderMissingReason, "header %s not found", config.AuthHeader))
-			return
-		}
-
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
+				log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
+				response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
 				return
 			}
-			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderInvalidReason, "error validating token: %v", err))
+			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderInvalidReason, "error validating token: %v", err))
+			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderInvalidReason, "error validating token: %v", err))
 			return
 		}
-		header := result[config.AuthHeader]
+		header := result[config.Header]
 		if header == nil {
-			handleError(c, authHeader, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
+			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"), config.Header, header)
+			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
 			return
 		}
 
