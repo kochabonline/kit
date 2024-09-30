@@ -1,0 +1,41 @@
+package kafka
+
+import (
+	"github.com/segmentio/kafka-go"
+
+	"github.com/kochabonline/kit/core/reflect"
+)
+
+type Balancer int
+
+const (
+	BalancerLeastBytes Balancer = iota
+	BalancerHash
+)
+
+type Config struct {
+	Brokers                []string `json:"brokers" default:"localhost:9092"`
+	Username               string   `json:"username"`
+	Password               string   `json:"password"`
+	Balancer               Balancer `json:"balancer" default:"0"`
+	Partition              int      `json:"partition" default:"0"`
+	AllowAutoTopicCreation bool     `json:"allowAutoTopicCreation" default:"false"`
+	Timeout                int      `json:"timeout" default:"3"`
+	MinBytes               int      `json:"minBytes" default:"1"`
+	MaxBytes               int      `json:"maxBytes" default:"1048576"` // 1MB
+}
+
+func (c *Config) init() error {
+	return reflect.SetDefaultTag(c)
+}
+
+func (c *Config) balancer() kafka.Balancer {
+	switch c.Balancer {
+	case BalancerLeastBytes:
+		return &kafka.LeastBytes{}
+	case BalancerHash:
+		return &kafka.Hash{}
+	default:
+		return &kafka.LeastBytes{}
+	}
+}

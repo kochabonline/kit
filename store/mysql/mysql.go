@@ -10,14 +10,17 @@ import (
 
 type Mysql struct {
 	Client *gorm.DB
+	config *Config
 }
 
 type Option func(*Mysql)
 
 func New(c *Config, opts ...Option) (*Mysql, error) {
-	m := &Mysql{}
+	m := &Mysql{
+		config: c,
+	}
 
-	if err := c.initConfig(); err != nil {
+	if err := m.config.init(); err != nil {
 		return m, err
 	}
 
@@ -25,26 +28,26 @@ func New(c *Config, opts ...Option) (*Mysql, error) {
 		opt(m)
 	}
 
-	return m.new(c)
+	return m.new()
 }
 
-func (m *Mysql) new(c *Config) (*Mysql, error) {
-	var err error
-	m.Client, err = gorm.Open(mysql.Open(c.dsn()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.LogLevel(c.LogLevel())),
+func (m *Mysql) new() (*Mysql, error) {
+	client, err := gorm.Open(mysql.Open(m.config.dsn()), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.LogLevel(m.config.LogLevel())),
 	})
 	if err != nil {
 		return nil, err
 	}
+	m.Client = client
 
 	sqlDB, err := m.Client.DB()
 	if err != nil {
 		return nil, err
 	}
 
-	sqlDB.SetMaxIdleConns(c.MaxIdleConns)
-	sqlDB.SetMaxOpenConns(c.MaxOpenConns)
-	sqlDB.SetConnMaxLifetime(time.Duration(c.ConnMaxLifetime))
+	sqlDB.SetMaxIdleConns(m.config.MaxIdleConns)
+	sqlDB.SetMaxOpenConns(m.config.MaxOpenConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(m.config.ConnMaxLifetime))
 
 	return m, nil
 }

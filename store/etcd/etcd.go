@@ -8,14 +8,17 @@ import (
 
 type Etcd struct {
 	Client *clientv3.Client
+	config *Config
 }
 
 type Option func(*Etcd)
 
 func New(c *Config, opts ...Option) (*Etcd, error) {
-	e := &Etcd{}
+	e := &Etcd{
+		config: c,
+	}
 
-	if err := c.initConfig(); err != nil {
+	if err := e.config.init(); err != nil {
 		return e, err
 	}
 
@@ -23,20 +26,20 @@ func New(c *Config, opts ...Option) (*Etcd, error) {
 		opt(e)
 	}
 
-	return e.new(c)
+	return e.new()
 }
 
-func (e *Etcd) new(c *Config) (*Etcd, error) {
-	var err error
-	e.Client, err = clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		Username:    c.Username,
-		Password:    c.Password,
-		DialTimeout: time.Duration(c.DialTimeout) * time.Second,
+func (e *Etcd) new() (*Etcd, error) {
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   e.config.Endpoints,
+		Username:    e.config.Username,
+		Password:    e.config.Password,
+		DialTimeout: time.Duration(e.config.DialTimeout) * time.Second,
 	})
 	if err != nil {
 		return nil, err
 	}
+	e.Client = client
 
 	return e, nil
 }

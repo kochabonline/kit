@@ -32,21 +32,21 @@ func NewTokenBucketLimiter(client *redis.Client, bucketKey string, capacity, rat
 	}
 }
 
-func (l *TokenBucketLimiter) Allow() bool {
-	return l.AllowN(time.Now(), 1)
+func (lim *TokenBucketLimiter) Allow() bool {
+	return lim.AllowN(time.Now(), 1)
 }
 
-func (l *TokenBucketLimiter) AllowN(t time.Time, n int) bool {
-	return l.AllowNCtx(context.Background(), t, n)
+func (lim *TokenBucketLimiter) AllowN(t time.Time, n int) bool {
+	return lim.AllowNCtx(context.Background(), t, n)
 }
 
-func (l *TokenBucketLimiter) AllowNCtx(ctx context.Context, t time.Time, n int) bool {
-	return l.reserveN(ctx, t, n)
+func (lim *TokenBucketLimiter) AllowNCtx(ctx context.Context, t time.Time, n int) bool {
+	return lim.reserveN(ctx, t, n)
 }
 
-func (l *TokenBucketLimiter) reserveN(ctx context.Context, t time.Time, n int) bool {
+func (lim *TokenBucketLimiter) reserveN(ctx context.Context, t time.Time, n int) bool {
 	now := t.Unix()
-	result, err := l.script.Run(ctx, l.client, []string{l.bucketKey}, l.capacity, l.rate, now, n).Result()
+	result, err := lim.script.Run(ctx, lim.client, []string{lim.bucketKey}, lim.capacity, lim.rate, now, n).Result()
 	if err != nil {
 		return false
 	}

@@ -9,6 +9,6 @@ type Config struct {
 	DialTimeout int64    `json:"dial_timeout" default:"5"`
 }
 
-func (c *Config) initConfig() error {
+func (c *Config) init() error {
 	return reflect.SetDefaultTag(c)
 }

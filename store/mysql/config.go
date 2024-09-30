@@ -1,7 +1,9 @@
 package mysql
 
 import (
-	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/kochabonline/kit/core/reflect"
 )
 
@@ -12,7 +14,7 @@ type Config struct {
 	Password        string `json:"password"`
 	DataBase        string `json:"database"`
 	Charset         string `json:"charset" default:"utf8mb4"`
-	ParseTime       *bool  `json:"parseTime" default:"true"`
+	ParseTime       bool   `json:"parseTime" default:"true"`
 	Loc             string `json:"loc" default:"Local"`
 	Timeout         int    `json:"timeout" default:"10"`
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
@@ -21,26 +23,34 @@ type Config struct {
 	Level           string `json:"level" default:"silent"`
 }
 
-func (c *Config) initConfig() error {
+func (c *Config) init() error {
 	return reflect.SetDefaultTag(c)
 }
 
 func (c *Config) dsn() string {
-	parseTime := "False"
-	if c.ParseTime != nil && *c.ParseTime {
-		parseTime = "True"
+	var builder strings.Builder
+
+	builder.WriteString(c.Username)
+	builder.WriteString(":")
+	builder.WriteString(c.Password)
+	builder.WriteString("@tcp(")
+	builder.WriteString(c.Host)
+	builder.WriteString(":")
+	builder.WriteString(strconv.Itoa(c.Port))
+	builder.WriteString(")/")
+	builder.WriteString(c.DataBase)
+	builder.WriteString("?charset=")
+	builder.WriteString(c.Charset)
+	builder.WriteString("&loc=")
+	builder.WriteString(c.Loc)
+	builder.WriteString("&timeout=")
+	builder.WriteString(strconv.Itoa(c.Timeout))
+	builder.WriteString("s")
+	if c.ParseTime {
+		builder.WriteString("&parseTime=True")
 	}
 
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%s&loc=%s&timeout=%ds",
-		c.Username,
-		c.Password,
-		c.Host,
-		c.Port,
-		c.DataBase,
-		c.Charset,
-		parseTime,
-		c.Loc,
-		c.Timeout)
+	return builder.String()
 }
 
 func (c *Config) LogLevel() int {

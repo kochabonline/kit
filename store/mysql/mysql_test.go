@@ -5,7 +5,9 @@ import (
 )
 
 func TestMysql(t *testing.T) {
-	m, err := New(&Config{})
+	m, err := New(&Config{
+		Password: "12345678",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
