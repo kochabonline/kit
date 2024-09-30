@@ -21,8 +21,8 @@ type Config struct {
 	Partition              int      `json:"partition" default:"0"`
 	AllowAutoTopicCreation bool     `json:"allowAutoTopicCreation" default:"false"`
 	Timeout                int      `json:"timeout" default:"3"`
-	MinBytes               int      `json:"minBytes" default:"1"`
-	MaxBytes               int      `json:"maxBytes" default:"1048576"` // 1MB
+	MinBytes               float64  `json:"minBytes" default:"1024"`    // 1KB
+	MaxBytes               float64  `json:"maxBytes" default:"1048576"` // 1MB
 }
 
 func (c *Config) init() error {

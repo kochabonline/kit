@@ -29,6 +29,13 @@ func New(c *Config, opts ...Option) (*Kafka, error) {
 	return k, nil
 }
 
+func (k *Kafka) mechanism() plain.Mechanism {
+	return plain.Mechanism{
+		Username: k.config.Username,
+		Password: k.config.Password,
+	}
+}
+
 func (k *Kafka) dialer() *kafka.Dialer {
 	dialer := &kafka.Dialer{
 		Timeout:   time.Duration(k.config.Timeout) * time.Second,
@@ -36,12 +43,7 @@ func (k *Kafka) dialer() *kafka.Dialer {
 	}
 
 	if k.config.Username != "" && k.config.Password != "" {
-		mechanism := plain.Mechanism{
-			Username: k.config.Username,
-			Password: k.config.Password,
-		}
-
-		dialer.SASLMechanism = mechanism
+		dialer.SASLMechanism = k.mechanism()
 	}
 
 	return dialer
@@ -51,12 +53,7 @@ func (k *Kafka) transport() *kafka.Transport {
 	transport := &kafka.Transport{}
 
 	if k.config.Username != "" && k.config.Password != "" {
-		mechanism := plain.Mechanism{
-			Username: k.config.Username,
-			Password: k.config.Password,
-		}
-
-		transport.SASL = mechanism
+		transport.SASL = k.mechanism()
 	}
 
 	return transport
@@ -88,20 +85,19 @@ func (k *Kafka) Consumer(topic string) *kafka.Reader {
 		Brokers:   k.config.Brokers,
 		Topic:     topic,
 		Partition: k.config.Partition,
-		MinBytes:  k.config.MinBytes,
-		MaxBytes:  k.config.MaxBytes,
+		MinBytes:  int(k.config.MinBytes),
+		MaxBytes:  int(k.config.MaxBytes),
 		Dialer:    k.dialer(),
 	})
 }
 
-func (k *Kafka) ConsumerGroup(topic string, group string) *kafka.Reader {
+func (k *Kafka) ConsumerGroup(topic string, groupId string) *kafka.Reader {
 	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   k.config.Brokers,
-		GroupID:   group,
-		Topic:     topic,
-		Partition: k.config.Partition,
-		MinBytes:  k.config.MinBytes,
-		MaxBytes:  k.config.MaxBytes,
-		Dialer:    k.dialer(),
+		Brokers:  k.config.Brokers,
+		GroupID:  groupId,
+		Topic:    topic,
+		MinBytes: int(k.config.MinBytes),
+		MaxBytes: int(k.config.MaxBytes),
+		Dialer:   k.dialer(),
 	})
 }
