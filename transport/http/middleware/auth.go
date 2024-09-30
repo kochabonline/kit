@@ -15,8 +15,8 @@ const (
 )
 
 const (
-	ErrAuthHeaderMissingReason = "missing auth header"
-	ErrAuthHeaderInvalidReason = "invalid auth header"
+	ErrAuthHeaderMissing = "missing auth header"
+	ErrAuthHeaderInvalid = "invalid auth header"
 )
 
 type AuthConfig struct {
@@ -45,18 +45,18 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
-				response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
+				log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
+				response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
 				return
 			}
-			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderInvalidReason, "error validating token: %v", err))
-			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderInvalidReason, "error validating token: %v", err))
+			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderInvalid, "error validating token: %v", err))
+			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderInvalid, "error validating token: %v", err))
 			return
 		}
 		header := result[config.Header]
 		if header == nil {
-			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"), config.Header, header)
-			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissingReason, "token not found"))
+			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, "token not found"), config.Header, header)
+			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
 			return
 		}
 

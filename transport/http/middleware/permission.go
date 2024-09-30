@@ -12,7 +12,7 @@ const (
 )
 
 var (
-	ErrPermissionForbiddenReason = "permission denied"
+	ErrPermissionForbidden = "permission denied"
 )
 
 type PermissionConfig struct {
@@ -43,7 +43,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		id, role, err := config.Validate(c)
 		if err != nil {
-			handleError(c, strconv.FormatInt(id, 10), errors.Forbidden(ErrPermissionForbiddenReason, "permission failed to validate: %v", err))
+			handleError(c, strconv.FormatInt(id, 10), errors.Forbidden(ErrPermissionForbidden, "permission failed to validate: %v", err))
 			return
 		}
 
@@ -54,7 +54,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		idStr := strconv.FormatInt(id, 10)
 		if paramValue != idStr {
-			handleError(c, idStr, errors.Forbidden(ErrPermissionForbiddenReason, "%s is not allowed to access %s", idStr, paramValue))
+			handleError(c, idStr, errors.Forbidden(ErrPermissionForbidden, "%s is not allowed to access %s", idStr, paramValue))
 			return
 		}
 

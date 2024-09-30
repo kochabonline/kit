@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrCasbinForbiddenReason = "permission denied"
+	ErrCasbinForbidden = "permission denied"
 )
 
 type CasbinConfig struct {
@@ -26,16 +26,16 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 		method := c.Request.Method
 		user, sub, err := config.Sub(c)
 		if err != nil {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbiddenReason, "casbin failed to get subject: %v", err))
+			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, "casbin failed to get subject: %v", err))
 			return
 		}
 		ok, err := config.E.Enforce(sub, path, method)
 		if err != nil {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbiddenReason, "casbin failed to enforce: %v", err))
+			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, "casbin failed to enforce: %v", err))
 			return
 		}
 		if !ok {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbiddenReason, "casbin denied access to %s %s for %s", method, path, sub))
+			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, "casbin denied access to %s %s for %s", method, path, sub))
 			return
 		}
 		c.Next()
