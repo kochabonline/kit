@@ -10,8 +10,7 @@ import (
 type Config struct {
 	Host        string `json:"host" default:"localhost"`
 	Port        string `json:"port" default:"27017"`
-	Database    string `json:"database"`
-	Username    string `json:"username" default:"root"`
+	User        string `json:"user" default:"root"`
 	Password    string `json:"password"`
 	MaxPoolSize int    `json:"maxPoolSize" default:"10"`
 	Timeout     int    `json:"timeout" default:"3"`
@@ -21,8 +20,8 @@ func (c *Config) uri() string {
 	var builer strings.Builder
 
 	builer.WriteString("mongodb://")
-	if c.Username != "" && c.Password != "" {
-		builer.WriteString(c.Username)
+	if c.User != "" && c.Password != "" {
+		builer.WriteString(c.User)
 		builer.WriteString(":")
 		builer.WriteString(c.Password)
 	}

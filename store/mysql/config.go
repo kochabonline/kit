@@ -10,7 +10,7 @@ import (
 type Config struct {
 	Host            string `json:"host" default:"localhost"`
 	Port            int    `json:"port" default:"3306"`
-	Username        string `json:"username" default:"root"`
+	User            string `json:"user" default:"root"`
 	Password        string `json:"password"`
 	DataBase        string `json:"database"`
 	Charset         string `json:"charset" default:"utf8mb4"`
@@ -30,7 +30,7 @@ func (c *Config) init() error {
 func (c *Config) dsn() string {
 	var builder strings.Builder
 
-	builder.WriteString(c.Username)
+	builder.WriteString(c.User)
 	builder.WriteString(":")
 	builder.WriteString(c.Password)
 	builder.WriteString("@tcp(")
