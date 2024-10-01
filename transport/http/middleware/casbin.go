@@ -26,12 +26,12 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 		method := c.Request.Method
 		user, sub, err := config.Sub(c)
 		if err != nil {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, "casbin failed to get subject: %v", err))
+			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, err.Error()))
 			return
 		}
 		ok, err := config.E.Enforce(sub, path, method)
 		if err != nil {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, "casbin failed to enforce: %v", err))
+			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, err.Error()))
 			return
 		}
 		if !ok {

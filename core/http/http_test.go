@@ -1,7 +1,6 @@
-package tools
+package http
 
 import (
-	"net/http"
 	"testing"
 )
 
@@ -12,8 +11,8 @@ type Response struct {
 func TestHttp(t *testing.T) {
 	url := Url("http://localhost:8080", WithUrlRefs("health"))
 	var response Response
-	client := New()
-	err := client.Request(http.MethodGet, url, nil, WithRequestResponse(&response))
+	http := New()
+	err := http.Request(MethodGet, url, nil, WithRequestResponse(&response))
 	if err != nil {
 		t.Error(err)
 	}

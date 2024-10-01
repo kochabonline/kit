@@ -1,61 +1,29 @@
-package tools
+package http
 
 import (
 	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 
 	"github.com/kochabonline/kit/errors"
 )
 
-type UrlOption struct {
-	Refs   []string
-	Params map[string]string
-}
+const (
+	ErrBadRequest = "http request failed"
+)
 
-func WithUrlRefs(refs ...string) func(*UrlOption) {
-	return func(opt *UrlOption) {
-		opt.Refs = refs
-	}
-}
-
-func WithUrlParams(params map[string]string) func(*UrlOption) {
-	return func(opt *UrlOption) {
-		opt.Params = params
-	}
-}
-
-func Url(base string, opts ...func(*UrlOption)) string {
-	baseUrl, err := url.Parse(base)
-	if err != nil {
-		return ""
-	}
-
-	opt := &UrlOption{}
-	for _, o := range opts {
-		o(opt)
-	}
-
-	if len(opt.Refs) > 0 {
-		for _, ref := range opt.Refs {
-			baseUrl.Path, err = url.JoinPath(baseUrl.Path, ref)
-			if err != nil {
-				return ""
-			}
-		}
-	}
-	if len(opt.Params) > 0 {
-		q := baseUrl.Query()
-		for k, v := range opt.Params {
-			q.Add(k, v)
-		}
-		baseUrl.RawQuery = q.Encode()
-	}
-
-	return baseUrl.String()
-}
+const (
+	MethodGet     = "GET"
+	MethodHead    = "HEAD"
+	MethodPost    = "POST"
+	MethodPut     = "PUT"
+	MethodPatch   = "PATCH" // RFC 5789
+	MethodDelete  = "DELETE"
+	MethodConnect = "CONNECT"
+	MethodOptions = "OPTIONS"
+	MethodTrace   = "TRACE"
+)
 
 type Client interface {
 	Request(method, url string, body io.Reader, opts ...func(*RequestOption)) (any, error)
@@ -67,12 +35,14 @@ type Http struct {
 
 type Option func(*Http)
 
-func WithHttpClient(client *http.Client) func(*Http) {
+// WithClient sets the HTTP client.
+func WithClient(client *http.Client) func(*Http) {
 	return func(h *Http) {
 		h.client = client
 	}
 }
 
+// New creates a new HTTP client.
 func New(opts ...Option) *Http {
 	h := &Http{
 		client: &http.Client{},
@@ -83,25 +53,28 @@ func New(opts ...Option) *Http {
 	return h
 }
 
+// RequestOption is the option for the HTTP request.
 type RequestOption struct {
 	header   map[string]string
 	response any
 }
 
+// WithRequestHeader sets the request header.
 func WithRequestHeader(header map[string]string) func(*RequestOption) {
 	return func(opt *RequestOption) {
 		opt.header = header
 	}
 }
 
-// Must pass a pointer
-// Passing a pointer is to modify the value of an external variable within the function
+// WithRequestResponse sets the response object to unmarshal the response body.
+// The response object must be a pointer.
 func WithRequestResponse(response any) func(*RequestOption) {
 	return func(opt *RequestOption) {
 		opt.response = response
 	}
 }
 
+// Request sends an HTTP request.
 func (h *Http) Request(method, url string, body io.Reader, opts ...func(*RequestOption)) error {
 	opt := &RequestOption{}
 
@@ -139,7 +112,7 @@ func (h *Http) Request(method, url string, body io.Reader, opts ...func(*Request
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.BadRequest("http request failed", string(respByte))
+		return errors.BadRequest(ErrBadRequest, string(respByte))
 	}
 
 	if opt.response != nil {

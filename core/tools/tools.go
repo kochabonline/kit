@@ -36,6 +36,7 @@ func Hostname() string {
 	return hostname
 }
 
+// GenerateRandomCode generates a random code with the specified length.
 func GenerateRandomCode(length int) string {
 	source := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(source)

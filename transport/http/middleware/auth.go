@@ -45,12 +45,12 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		result, err := config.Validate(c)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
-				response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
+				log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, err.Error()))
+				response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissing, err.Error()))
 				return
 			}
-			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderInvalid, "error validating token: %v", err))
-			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderInvalid, "error validating token: %v", err))
+			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderInvalid, err.Error()))
+			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderInvalid, err.Error()))
 			return
 		}
 		header := result[config.Header]

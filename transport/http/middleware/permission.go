@@ -43,7 +43,7 @@ func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
 
 		id, role, err := config.Validate(c)
 		if err != nil {
-			handleError(c, strconv.FormatInt(id, 10), errors.Forbidden(ErrPermissionForbidden, "permission failed to validate: %v", err))
+			handleError(c, strconv.FormatInt(id, 10), errors.Forbidden(ErrPermissionForbidden, err.Error()))
 			return
 		}
 
