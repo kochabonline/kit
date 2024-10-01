@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	Host        string `json:"host" default:"localhost"`
-	Port        string `json:"port" default:"27017"`
+	Port        int    `json:"port" default:"27017"`
 	User        string `json:"user" default:"root"`
 	Password    string `json:"password"`
 	MaxPoolSize int    `json:"maxPoolSize" default:"10"`
@@ -28,7 +28,7 @@ func (c *Config) uri() string {
 	builer.WriteString("@")
 	builer.WriteString(c.Host)
 	builer.WriteString(":")
-	builer.WriteString(c.Port)
+	builer.WriteString(strconv.Itoa(c.Port))
 	builer.WriteString("/?maxPoolSize=")
 	builer.WriteString(strconv.Itoa(c.MaxPoolSize))
 
