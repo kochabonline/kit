@@ -22,13 +22,12 @@ const (
 type AuthConfig struct {
 	// Header is the header key to look for the auth value
 	Header string
-	// Validate is a function that takes a gin context and returns the auth value
-	// The contents in the map will be put into the context
-	// The fields that must be included are: userId, token
-	// struct{} or a type that implements the String() method
-	Validate func(c *gin.Context) (map[any]any, error)
 	// SkippedPathPrefixes is a list of path prefixes that should be skipped from auth
 	SkippedPathPrefixes []string
+	// Validate is a function that takes a gin context and returns the auth value
+	// The fields that must be included are: token, userId, userRole
+	// struct{} or a type that implements the String() method
+	Validate func(c *gin.Context) (map[any]any, error)
 }
 
 func AuthWithConfig(config AuthConfig) gin.HandlerFunc {

@@ -5,56 +5,116 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
+	"github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/transport/http/response"
 )
 
 const (
 	defaultParam = "id"
 )
 
-var (
+const (
 	ErrPermissionForbidden = "permission denied"
 )
 
-type PermissionConfig struct {
+type PermissionHPEConfig struct {
 	// Param is the param key to look for the id value
 	Param string
-	// Validate is a function that takes a gin context and returns the auth value
-	Validate func(c *gin.Context) (id int64, role int, err error)
 	// SkippedRoles is a list of roles that should be skipped from permission
-	SkippedRole int
+	SkippedRoles []int
+	// Validate is a function that takes a gin context and returns the auth value
+	Validate func(c *gin.Context) (userId int64, userRole int, err error)
 }
 
-func PermissionWithConfig(config PermissionConfig) gin.HandlerFunc {
+func PermissionHPE() gin.HandlerFunc {
+	return PermissionHPEWithConfig(PermissionHPEConfig{})
+}
+
+func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 	if config.Param == "" {
 		config.Param = defaultParam
 	}
 
 	return func(c *gin.Context) {
-		if config.Validate == nil {
-			c.Next()
-			return
-		}
-
 		paramValue := c.Param(config.Param)
 		if paramValue == "" {
 			c.Next()
 			return
 		}
 
-		id, role, err := config.Validate(c)
-		if err != nil {
-			handleError(c, strconv.FormatInt(id, 10), errors.Forbidden(ErrPermissionForbidden, err.Error()))
-			return
+		var userId int64
+		var userRole int
+		var err error
+
+		if config.Validate == nil {
+			userId, userRole, err = userInfo(c)
+			if err != nil {
+				log.Errorw("error", err.Error())
+				response.GinJSONError(c, err)
+				return
+			}
+		} else {
+			userId, userRole, err = config.Validate(c)
+			if err != nil {
+				log.Errorw("error", err.Error())
+				response.GinJSONError(c, err)
+				return
+			}
 		}
 
-		if role >= config.SkippedRole {
+		if findRoleWithEmpty(userRole, config.SkippedRoles...) {
 			c.Next()
 			return
 		}
 
-		idStr := strconv.FormatInt(id, 10)
-		if paramValue != idStr {
-			handleError(c, idStr, errors.Forbidden(ErrPermissionForbidden, "%s is not allowed to access %s", idStr, paramValue))
+		if paramValue != strconv.FormatInt(userId, 10) {
+			log.Errorw("userId", userId, "error", errors.Forbidden(ErrPermissionForbidden, "%d is not allowed to access %s", userId, paramValue))
+			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden, "%d is not allowed to access %s", userId, paramValue))
+			return
+		}
+
+		c.Next()
+	}
+}
+
+type PermissionVPEConfig struct {
+	// AllowRole is the role level that should be allowed to access
+	AllowedRoles []int
+	// Validate is a function that takes a gin context and returns the auth value
+	Validate func(c *gin.Context) (userId int64, userRole int, err error)
+}
+
+func PermissionAllow(roles ...int) gin.HandlerFunc {
+	return PermissionVPEWithConfig(PermissionVPEConfig{
+		AllowedRoles: roles,
+	})
+}
+
+func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var userId int64
+		var userRole int
+		var err error
+
+		if config.Validate == nil {
+			userId, userRole, err = userInfo(c)
+			if err != nil {
+				log.Errorw("error", err.Error())
+				response.GinJSONError(c, err)
+				return
+			}
+		} else {
+			userId, userRole, err = config.Validate(c)
+			if err != nil {
+				log.Errorw("error", err.Error())
+				response.GinJSONError(c, err)
+				return
+			}
+		}
+
+		if !findRoleWithEmpty(userRole, config.AllowedRoles...) {
+			log.Errorw("userId", userId, "userRole", userRole, "error", errors.Forbidden(ErrPermissionForbidden, "%d is not allowed to access", userRole))
+			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden, "%d is not allowed to access", userRole))
 			return
 		}
 

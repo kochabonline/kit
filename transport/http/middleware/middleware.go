@@ -2,18 +2,8 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/transport/http/response"
+	"github.com/kochabonline/kit/core/tools"
 )
-
-func handleError(c *gin.Context, user string, err error) {
-	if err == nil {
-		return
-	}
-
-	log.Errorw("user", user, "error", err)
-	response.GinJSONError(c, err)
-}
 
 func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {
 	if len(prefixes) == 0 {
@@ -28,4 +18,31 @@ func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {
 	}
 
 	return false
+}
+
+func findRoleWithEmpty(userRole int, roles ...int) bool {
+	if len(roles) == 0 {
+		return true
+	}
+
+	for _, role := range roles {
+		if userRole == role {
+			return true
+		}
+	}
+
+	return false
+}
+
+func userInfo(c *gin.Context) (userId int64, userRole int, err error) {
+	ctx := c.Request.Context()
+	userId, err = tools.CtxValue[int64](ctx, "userId")
+	if err != nil {
+		return
+	}
+	userRole, err = tools.CtxValue[int](ctx, "userRole")
+	if err != nil {
+		return
+	}
+	return
 }

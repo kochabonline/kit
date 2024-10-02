@@ -4,9 +4,11 @@ import (
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
+	"github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/transport/http/response"
 )
 
-var (
+const (
 	ErrCasbinForbidden = "permission denied"
 )
 
@@ -26,18 +28,22 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 		method := c.Request.Method
 		user, sub, err := config.Sub(c)
 		if err != nil {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, err.Error()))
+			log.Errorw("user", user, "error", err.Error())
+			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, err.Error()))
 			return
 		}
 		ok, err := config.E.Enforce(sub, path, method)
 		if err != nil {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, err.Error()))
+			log.Errorw("user", user, "error", err.Error())
+			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, err.Error()))
 			return
 		}
 		if !ok {
-			handleError(c, user, errors.Forbidden(ErrCasbinForbidden, "casbin denied access to %s %s for %s", method, path, sub))
+			log.Errorw("user", user, "error", "casbin denied access to %s %s for %s", method, path, sub)
+			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, "casbin denied access to %s %s for %s", method, path, sub))
 			return
 		}
+
 		c.Next()
 	}
 }
