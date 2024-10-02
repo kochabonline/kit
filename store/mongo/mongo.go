@@ -34,7 +34,11 @@ func New(c *Config, opts ...Option) (*Mongo, error) {
 
 func (m *Mongo) new() (*Mongo, error) {
 	serverApi := options.ServerAPI(options.ServerAPIVersion1)
-	opts := options.Client().ApplyURI(m.config.uri()).SetServerAPIOptions(serverApi)
+	bsonOpts := &options.BSONOptions{
+		UseJSONStructTags: true,
+		NilSliceAsEmpty:   true,
+	}
+	opts := options.Client().ApplyURI(m.config.uri()).SetServerAPIOptions(serverApi).SetBSONOptions(bsonOpts)
 	client, err := mongo.Connect(context.TODO(), opts)
 	if err != nil {
 		return nil, err

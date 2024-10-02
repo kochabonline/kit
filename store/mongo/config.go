@@ -20,7 +20,7 @@ func (c *Config) uri() string {
 	var builer strings.Builder
 
 	builer.WriteString("mongodb://")
-	if c.User != "" && c.Password != "" {
+	if c.Password != "" {
 		builer.WriteString(c.User)
 		builer.WriteString(":")
 		builer.WriteString(c.Password)
