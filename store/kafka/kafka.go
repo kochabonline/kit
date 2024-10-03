@@ -1,12 +1,14 @@
 package kafka
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
+	"golang.org/x/sync/errgroup"
 )
 
 type Kafka struct {
@@ -173,17 +175,20 @@ func (k *Kafka) ConsumerGroup(topic string, groupId string) *kafka.Reader {
 }
 
 func (k *Kafka) Close() error {
+	eg, _ := errgroup.WithContext(context.Background())
+
 	for _, producer := range k.producers {
-		if err := producer.Close(); err != nil {
-			return err
-		}
+		producer := producer
+		eg.Go(func() error {
+			return producer.Close()
+		})
 	}
-
 	for _, consumer := range k.consumers {
-		if err := consumer.Close(); err != nil {
-			return err
-		}
+		consumer := consumer
+		eg.Go(func() error {
+			return consumer.Close()
+		})
 	}
 
-	return nil
+	return eg.Wait()
 }
