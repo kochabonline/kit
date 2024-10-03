@@ -99,6 +99,7 @@ func (a *App) Run() error {
 		})
 	}
 
+	// Wait for all servers to start
 	wg.Wait()
 
 	// Run cleanup functions

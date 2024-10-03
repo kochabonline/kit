@@ -2,7 +2,8 @@ package tools
 
 import (
 	"context"
-	"errors"
+
+	"github.com/kochabonline/kit/errors"
 )
 
 // CtxValue returns the value of the key from the context.
@@ -10,17 +11,17 @@ import (
 func CtxValue[T any](ctx context.Context, key any) (T, error) {
 	var value T
 	if ctx == nil {
-		return value, errors.New("context is nil")
+		return value, errors.Internal("context is nil", "key: %v", key)
 	}
 
 	val := ctx.Value(key)
 	if val == nil {
-		return value, errors.New("value not found")
+		return value, errors.Internal("context value not found", "key: %v", key)
 	}
 
 	if value, ok := val.(T); ok {
 		return value, nil
 	}
 
-	return value, errors.New("value type mismatch")
+	return value, errors.Internal("context value type mismatch", "key: %v, expected: %T, got: %T", key, value, val)
 }

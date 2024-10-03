@@ -7,7 +7,6 @@ import (
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport/http/response"
-	"gorm.io/gorm"
 )
 
 const (
@@ -15,8 +14,8 @@ const (
 )
 
 const (
+	ErrAuthUnauthorized  = "unauthorized"
 	ErrAuthHeaderMissing = "missing auth header"
-	ErrAuthHeaderInvalid = "invalid auth header"
 )
 
 type AuthConfig struct {
@@ -43,18 +42,13 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 
 		result, err := config.Validate(c)
 		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, err.Error()))
-				response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissing, err.Error()))
-				return
-			}
-			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderInvalid, err.Error()))
-			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderInvalid, err.Error()))
+			log.Errorw("error", errors.Unauthorized(ErrAuthUnauthorized, err.Error()))
+			response.GinJSONError(c, errors.Unauthorized(ErrAuthUnauthorized, err.Error()))
 			return
 		}
 		header := result[config.Header]
 		if header == nil {
-			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, "token not found"), config.Header, header)
+			log.Errorw("error", errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
 			response.GinJSONError(c, errors.Unauthorized(ErrAuthHeaderMissing, "token not found"))
 			return
 		}

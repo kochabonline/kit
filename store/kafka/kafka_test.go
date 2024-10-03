@@ -15,6 +15,7 @@ func TestProducer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer k.Close()
 	producer := k.Producer("test")
 	err = producer.WriteMessages(context.Background(),
 		kafka.Message{
@@ -33,7 +34,6 @@ func TestProducer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer producer.Close()
 }
 
 func TestConsumer(t *testing.T) {
@@ -43,9 +43,9 @@ func TestConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer k.Close()
 
 	consumer := k.Consumer("test")
-	defer consumer.Close()
 
 	for {
 		m, err := consumer.ReadMessage(context.Background())
@@ -64,9 +64,9 @@ func TestConsumerGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer k.Close()
 
 	consumerGroup := k.ConsumerGroup("test", "test")
-	defer consumerGroup.Close()
 
 	for {
 		m, err := consumerGroup.ReadMessage(context.Background())
