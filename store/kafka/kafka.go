@@ -175,7 +175,10 @@ func (k *Kafka) ConsumerGroup(topic string, groupId string) *kafka.Reader {
 }
 
 func (k *Kafka) Close() error {
-	eg, _ := errgroup.WithContext(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(k.config.CloseTimeout)*time.Second)
+	defer cancel()
+
+	eg, _ := errgroup.WithContext(ctx)
 
 	for _, producer := range k.producers {
 		producer := producer

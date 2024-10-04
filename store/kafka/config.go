@@ -23,6 +23,7 @@ type Config struct {
 	Timeout                int      `json:"timeout" default:"3"`
 	MinBytes               float64  `json:"minBytes" default:"1024"`    // 1KB
 	MaxBytes               float64  `json:"maxBytes" default:"1048576"` // 1MB
+	CloseTimeout           int      `json:"closeTimeout" default:"5"`
 }
 
 func (c *Config) init() error {

@@ -10,7 +10,7 @@ import (
 
 func TestProducer(t *testing.T) {
 	k, err := New(&Config{
-		Brokers:                []string{"127.0.0.1:9094"},
+		Brokers:                []string{"127.0.0.1:9092"},
 		AllowAutoTopicCreation: true})
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +38,7 @@ func TestProducer(t *testing.T) {
 
 func TestConsumer(t *testing.T) {
 	k, err := New(&Config{
-		Brokers: []string{"127.0.0.1:9094"},
+		Brokers: []string{"127.0.0.1:9092"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestConsumer(t *testing.T) {
 
 func TestConsumerGroup(t *testing.T) {
 	k, err := New(&Config{
-		Brokers: []string{"127.0.0.1:9094"},
+		Brokers: []string{"127.0.0.1:9092"},
 	})
 	if err != nil {
 		t.Fatal(err)

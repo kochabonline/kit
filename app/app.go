@@ -20,7 +20,7 @@ type App struct {
 	servers         []transport.Server
 	sigs            []os.Signal
 	shutdownTimeout time.Duration
-	cleanup         []func()
+	cleanFunc       []func()
 	logger          *log.Helper
 }
 
@@ -50,9 +50,9 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithCleanup(cleanup ...func()) Option {
+func WithCleanFunc(clean ...func()) Option {
 	return func(a *App) {
-		a.cleanup = append(a.cleanup, cleanup...)
+		a.cleanFunc = append(a.cleanFunc, clean...)
 	}
 }
 
@@ -102,11 +102,6 @@ func (a *App) Run() error {
 	// Wait for all servers to start
 	wg.Wait()
 
-	// Run cleanup functions
-	for _, c := range a.cleanup {
-		c()
-	}
-
 	// Handle signals
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, a.sigs...)
@@ -115,6 +110,17 @@ func (a *App) Run() error {
 		select {
 		case signal := <-ch:
 			a.logger.Infof("Received signal %s, shutting down", signal)
+
+			cwg := sync.WaitGroup{}
+			for _, clean := range a.cleanFunc {
+				cwg.Add(1)
+				go func(fn func()) {
+					defer cwg.Done()
+					fn()
+				}(clean)
+			}
+			cwg.Wait()
+
 			return context.Canceled
 		case <-ctx.Done():
 			return nil
