@@ -9,38 +9,44 @@ import (
 )
 
 const (
-	ErrCasbinForbidden = "permission denied"
+	ErrCasbinForbidden = "access forbidden"
 )
 
 type CasbinConfig struct {
-	E   *casbin.SyncedCachedEnforcer
-	Sub func(c *gin.Context) (user string, role string, err error)
+	E *casbin.SyncedCachedEnforcer
+}
+
+func Casbin(e *casbin.SyncedCachedEnforcer) gin.HandlerFunc {
+	return CasbinWithConfig(CasbinConfig{
+		E: e,
+	})
 }
 
 func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if config.E == nil || config.Sub == nil {
+		if config.E == nil {
 			c.Next()
 			return
 		}
 
-		path := c.Request.URL.Path
-		method := c.Request.Method
-		user, sub, err := config.Sub(c)
+		obj := c.Request.URL.Path
+		act := c.Request.Method
+		user, sub, err := userInfo(c)
 		if err != nil {
-			log.Errorw("user", user, "error", err.Error())
+			log.Errorw("user", user, "role", sub, "path", obj, "method", act, "error", err.Error())
 			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, err.Error()))
 			return
 		}
-		ok, err := config.E.Enforce(sub, path, method)
+
+		ok, err := config.E.Enforce(sub, obj, act)
 		if err != nil {
-			log.Errorw("user", user, "error", err.Error())
+			log.Errorw("user", user, "role", sub, "path", obj, "method", act, "error", err.Error())
 			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, err.Error()))
 			return
 		}
 		if !ok {
-			log.Errorw("user", user, "error", "casbin denied access to %s %s for %s", method, path, sub)
-			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, "casbin denied access to %s %s for %s", method, path, sub))
+			log.Errorw("user", user, "role", sub, "path", obj, "method", act, "error", "casbin denied access")
+			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden, "casbin denied access"))
 			return
 		}
 

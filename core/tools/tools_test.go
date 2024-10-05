@@ -9,4 +9,5 @@ func TestTools(t *testing.T) {
 	t.Log("IpV4:", IpV4())
 	t.Log("Hostname:", Hostname())
 	t.Log("GenerateRandomCode:", GenerateRandomCode(6))
+	t.Log("Contains:", Contains(4, 1, 2, 3))
 }

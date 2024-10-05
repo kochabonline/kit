@@ -47,3 +47,24 @@ func GenerateRandomCode(length int) string {
 	}
 	return string(code)
 }
+
+// Contains compares a value with a list of values and returns true if the value is found in the list.
+func Contains[T comparable](a T, list ...T) bool {
+	const threshold = 50
+
+	if len(list) < threshold {
+		for _, b := range list {
+			if b == a {
+				return true
+			}
+		}
+		return false
+	}
+
+	set := make(map[T]struct{}, len(list))
+	for _, b := range list {
+		set[b] = struct{}{}
+	}
+	_, found := set[a]
+	return found
+}
