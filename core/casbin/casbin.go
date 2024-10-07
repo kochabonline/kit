@@ -9,7 +9,7 @@ import (
 )
 
 type Casbin struct {
-	E *casbin.SyncedCachedEnforcer
+	SyncedCachedEnforcer *casbin.SyncedCachedEnforcer
 }
 
 func New(config Config) (*Casbin, error) {
@@ -23,14 +23,21 @@ func New(config Config) (*Casbin, error) {
 		return nil, err
 	}
 
-	c.E, err = casbin.NewSyncedCachedEnforcer(config.Model, a)
+	c.SyncedCachedEnforcer, err = casbin.NewSyncedCachedEnforcer(config.Model, a)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := c.E.LoadPolicy(); err != nil {
+	if err := c.SyncedCachedEnforcer.LoadPolicy(); err != nil {
 		return nil, err
 	}
 
 	return c, nil
+}
+
+func (c *Casbin) Close() {
+	if c.SyncedCachedEnforcer != nil {
+		c.SyncedCachedEnforcer.StopAutoLoadPolicy()
+		c.SyncedCachedEnforcer.ClearPolicy()
+	}
 }

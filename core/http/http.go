@@ -59,16 +59,16 @@ type RequestOption struct {
 	response any
 }
 
-// WithRequestHeader sets the request header.
-func WithRequestHeader(header map[string]string) func(*RequestOption) {
+// WithHeader sets the request header.
+func WithHeader(header map[string]string) func(*RequestOption) {
 	return func(opt *RequestOption) {
 		opt.header = header
 	}
 }
 
-// WithRequestResponse sets the response object to unmarshal the response body.
+// WithResponse sets the response object to unmarshal the response body.
 // The response object must be a pointer.
-func WithRequestResponse(response any) func(*RequestOption) {
+func WithResponse(response any) func(*RequestOption) {
 	return func(opt *RequestOption) {
 		opt.response = response
 	}
@@ -76,7 +76,11 @@ func WithRequestResponse(response any) func(*RequestOption) {
 
 // Request sends an HTTP request.
 func (h *Http) Request(method, url string, body io.Reader, opts ...func(*RequestOption)) error {
-	opt := &RequestOption{}
+	opt := &RequestOption{
+		header: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}
 
 	for _, o := range opts {
 		o(opt)

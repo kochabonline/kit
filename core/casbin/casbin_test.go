@@ -23,14 +23,12 @@ func TestCasbin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok, err := c.E.AddPolicy("alice", "data1", "read")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(ok)
-	ok2, err := c.E.Enforce("alice", "data1", "read")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(ok2)
+	c.AddMenuPolicies([]Menu{
+		{Role: "alice2", Path: "/admin", Method: "GET"},
+		{Role: "alice2", Path: "/admin", Method: "POST"},
+	})
+	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice2")
+	t.Log(c.Enforce("admin", "/admin", "GET"))
+	t.Log(c.GetMenuPolicies("alice"))
+	t.Log(c.GetMenuGroupingPolicies("admin"))
 }
