@@ -111,6 +111,7 @@ func (a *App) Run() error {
 		case signal := <-ch:
 			a.logger.Infof("Received signal %s, shutting down", signal)
 
+			// Wait for all clean functions to finish
 			cwg := sync.WaitGroup{}
 			for _, clean := range a.cleanFunc {
 				cwg.Add(1)

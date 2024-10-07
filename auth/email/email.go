@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	ErrEmailSendFailedReason     = "email send failed"
-	ErrEmailValidateFailedReason = "email validate failed"
+	ErrEmailSendFailed     = "email send failed"
+	ErrEmailValidateFailed = "email validate failed"
 )
 
 type Email struct {
@@ -80,7 +80,7 @@ func (e *EmailAuthenticator) Send(email Email, code string) (time.Duration, erro
 
 	ttl, err := e.cache.GetTTL(key)
 	if err != nil {
-		return 0, errors.BadRequest(ErrEmailSendFailedReason, "email captcha cache get ttl failed: %v", err)
+		return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache get ttl failed: %v", err)
 	}
 	if ttl > 0 {
 		return ttl, nil
@@ -89,7 +89,7 @@ func (e *EmailAuthenticator) Send(email Email, code string) (time.Duration, erro
 	eg, _ := errgroup.WithContext(context.Background())
 	eg.Go(func() error {
 		if err := e.cache.Set(key, code, e.expires); err != nil {
-			return errors.BadRequest(ErrEmailSendFailedReason, "email captcha cache set failed: %v", err)
+			return errors.BadRequest(ErrEmailSendFailed, "email captcha cache set failed: %v", err)
 		}
 		err := smtp.SendMail(
 			e.smtpPlainAuth.addr(),
@@ -99,9 +99,9 @@ func (e *EmailAuthenticator) Send(email Email, code string) (time.Duration, erro
 		)
 		if err != nil {
 			if err := e.cache.Delete(key); err != nil {
-				return errors.BadRequest(ErrEmailSendFailedReason, "email captcha cache delete failed: %v", err)
+				return errors.BadRequest(ErrEmailSendFailed, "email captcha cache delete failed: %v", err)
 			}
-			return errors.BadRequest(ErrEmailSendFailedReason, "%v", err)
+			return errors.BadRequest(ErrEmailSendFailed, "%v", err)
 		}
 
 		return nil
@@ -131,12 +131,12 @@ func (e *EmailAuthenticator) Validate(email string, code string) (bool, error) {
 
 	v, err := e.cache.Get(key)
 	if err != nil {
-		return false, errors.BadRequest(ErrEmailValidateFailedReason, "email captcha cache get failed: %v", err)
+		return false, errors.BadRequest(ErrEmailValidateFailed, "email captcha cache get failed: %v", err)
 	}
 
 	if v == code {
 		if err := e.cache.Delete(key); err != nil {
-			return false, errors.BadRequest(ErrEmailValidateFailedReason, "email captcha cache delete failed: %v", err)
+			return false, errors.BadRequest(ErrEmailValidateFailed, "email captcha cache delete failed: %v", err)
 		}
 		return true, nil
 	}

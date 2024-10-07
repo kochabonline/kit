@@ -53,8 +53,7 @@ func NewConfig(option Option, opts ...ConfigOption) *Config {
 		log:    log.DefaultLogger,
 	}
 
-	err := c.initConfig()
-	if err != nil {
+	if err := c.init(); err != nil {
 		c.log.Fatalf("default tag error: %s", err.Error())
 	}
 
@@ -67,7 +66,7 @@ func NewConfig(option Option, opts ...ConfigOption) *Config {
 	return c
 }
 
-func (c *Config) initConfig() error {
+func (c *Config) init() error {
 	return reflect.SetDefaultTag(c.Option.Target)
 }
 

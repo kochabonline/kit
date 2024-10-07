@@ -32,7 +32,7 @@ func Cors() gin.HandlerFunc {
 func CorsWithConfig(config CorsConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		if !tools.Contains(origin, config.AllowOrigins...) {
+		if !tools.Contains(origin, config.AllowOrigins) {
 			c.Next()
 			return
 		}

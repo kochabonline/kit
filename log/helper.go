@@ -57,15 +57,6 @@ func NewHelper(logger Logger, opts ...HelperOption) *Helper {
 	return h
 }
 
-func (h *Helper) Log(l level.Level, args ...any) {
-	if l < level.Debug || l > level.Fatal {
-		h.logger.Log(level.Error, h.msgKey, "invalid log level")
-		return
-	}
-
-	h.logger.Log(l, args...)
-}
-
 func (h *Helper) Debug(args ...any) {
 	h.logger.Log(level.Debug, h.msgKey, h.sprint(args...))
 }

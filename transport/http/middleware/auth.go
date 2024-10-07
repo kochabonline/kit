@@ -26,8 +26,6 @@ type AuthConfig struct {
 	// Validate is a function that takes a gin context and returns the auth value
 	// The fields that must be included are: token, userId, userRole
 	// struct{} or a type that implements the String() method
-	// example: 
-	// 
 	Validate func(c *gin.Context) (map[any]any, error)
 }
 

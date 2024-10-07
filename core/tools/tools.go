@@ -49,7 +49,7 @@ func GenerateRandomCode(length int) string {
 }
 
 // Contains compares a value with a list of values and returns true if the value is found in the list.
-func Contains[T comparable](a T, list ...T) bool {
+func Contains[T comparable](a T, list []T) bool {
 	const threshold = 50
 
 	if len(list) < threshold {

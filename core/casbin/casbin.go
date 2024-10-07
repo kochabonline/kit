@@ -13,12 +13,12 @@ type Casbin struct {
 }
 
 func New(config Config) (*Casbin, error) {
-	if config.Db == nil || config.Model == "" {
+	if config.DB == nil || config.Model == "" {
 		return nil, errors.New("invalid casbin config")
 	}
 
 	c := &Casbin{}
-	a, err := gormadapter.NewAdapterByDB(config.Db)
+	a, err := gormadapter.NewAdapterByDB(config.DB)
 	if err != nil {
 		return nil, err
 	}

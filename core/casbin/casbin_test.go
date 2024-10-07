@@ -7,13 +7,16 @@ import (
 )
 
 func TestCasbin(t *testing.T) {
-	m, err := mysql.New(&mysql.Config{})
+	m, err := mysql.New(&mysql.Config{
+		Password: "12345678",
+		DataBase: "test",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	c, err := New(Config{
-		Db:    m.Client,
+		DB:    m.Client,
 		Model: "./rbac_model.conf",
 	})
 	if err != nil {
