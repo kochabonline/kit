@@ -6,18 +6,30 @@ type Api struct {
 	Method string `json:"method"`
 }
 
-func (c *Casbin) GetApiGroupingPolicies(g string) []Api {
-	filter := c.SyncedCachedEnforcer.GetFilteredGroupingPolicy(0, g)
+func (c *Casbin) GetApiGroupingPolicies(g string) ([]Api, error) {
+	filter, err := c.SyncedCachedEnforcer.GetFilteredGroupingPolicy(0, g)
+	if err != nil {
+		return nil, err
+	}
+
 	var apis []Api
 	for _, v := range filter {
-		p := c.GetApiPolicies(v[1])
+		p, err := c.GetApiPolicies(v[1])
+		if err != nil {
+			return nil, err
+		}
 		apis = append(apis, p...)
 	}
-	return apis
+
+	return apis, nil
 }
 
-func (c *Casbin) GetApiPolicies(role string) []Api {
-	policies := c.SyncedCachedEnforcer.GetFilteredPolicy(0, role)
+func (c *Casbin) GetApiPolicies(role string) ([]Api, error) {
+	policies, err := c.SyncedCachedEnforcer.GetFilteredPolicy(0, role)
+	if err != nil {
+		return nil, err
+	}
+
 	apis := make([]Api, len(policies))
 	for i, policy := range policies {
 		apis[i] = Api{
@@ -26,7 +38,8 @@ func (c *Casbin) GetApiPolicies(role string) []Api {
 			Method: policy[2],
 		}
 	}
-	return apis
+
+	return apis, nil
 }
 
 func (c *Casbin) AddApiPolicies(apis []Api) (bool, error) {
@@ -40,7 +53,10 @@ func (c *Casbin) RemoveApiPolicies(apis []Api) (bool, error) {
 }
 
 func (c *Casbin) UpdateApiPolicies(apis []Api) (bool, error) {
-	oldApiPolicies := c.GetApiPolicies(apis[0].Role)
+	oldApiPolicies, err := c.GetApiPolicies(apis[0].Role)
+	if err != nil {
+		return false, err
+	}
 	oldPolicies := convertApisToPolicies(oldApiPolicies)
 	newPolicies := convertApisToPolicies(apis)
 	return c.SyncedCachedEnforcer.UpdatePolicies(oldPolicies, newPolicies)
