@@ -6,21 +6,17 @@ type Api struct {
 	Method string `json:"method"`
 }
 
-func (c *Casbin) GetApiGroupingPolicies(g string) ([]Api, error) {
+func (c *Casbin) GetApiGroupingPolicies(g string) []Api {
 	filter := c.SyncedCachedEnforcer.GetFilteredGroupingPolicy(0, g)
 	var apis []Api
 	for _, v := range filter {
-		p, err := c.GetApiPolicies(v[1])
-		if err != nil {
-			return nil, err
-		}
-
+		p := c.GetApiPolicies(v[1])
 		apis = append(apis, p...)
 	}
-	return apis, nil
+	return apis
 }
 
-func (c *Casbin) GetApiPolicies(role string) ([]Api, error) {
+func (c *Casbin) GetApiPolicies(role string) []Api {
 	policies := c.SyncedCachedEnforcer.GetFilteredPolicy(0, role)
 	apis := make([]Api, len(policies))
 	for i, policy := range policies {
@@ -30,40 +26,23 @@ func (c *Casbin) GetApiPolicies(role string) ([]Api, error) {
 			Method: policy[2],
 		}
 	}
-	return apis, nil
+	return apis
 }
 
 func (c *Casbin) AddApiPolicies(apis []Api) (bool, error) {
-	policies := make([][]string, len(apis))
-	for i, api := range apis {
-		policies[i] = []string{api.Role, api.Path, api.Method}
-	}
+	policies := convertApisToPolicies(apis)
 	return c.SyncedCachedEnforcer.AddPolicies(policies)
 }
 
 func (c *Casbin) RemoveApiPolicies(apis []Api) (bool, error) {
-	policies := make([][]string, len(apis))
-	for i, api := range apis {
-		policies[i] = []string{api.Role, api.Path, api.Method}
-	}
+	policies := convertApisToPolicies(apis)
 	return c.SyncedCachedEnforcer.RemovePolicies(policies)
 }
 
 func (c *Casbin) UpdateApiPolicies(apis []Api) (bool, error) {
-	oldApiPolicies, err := c.GetApiPolicies(apis[0].Role)
-	if err != nil {
-		return false, err
-	}
-
-	oldPolicies := make([][]string, len(oldApiPolicies))
-	for i, api := range oldApiPolicies {
-		oldPolicies[i] = []string{api.Role, api.Path, api.Method}
-	}
-
-	newPolicies := make([][]string, len(apis))
-	for i, api := range apis {
-		newPolicies[i] = []string{api.Role, api.Path, api.Method}
-	}
+	oldApiPolicies := c.GetApiPolicies(apis[0].Role)
+	oldPolicies := convertApisToPolicies(oldApiPolicies)
+	newPolicies := convertApisToPolicies(apis)
 	return c.SyncedCachedEnforcer.UpdatePolicies(oldPolicies, newPolicies)
 }
 
@@ -73,4 +52,12 @@ func (c *Casbin) RemoveRole(role string) (bool, error) {
 
 func (c *Casbin) Enforce(role string, path, method string) (bool, error) {
 	return c.SyncedCachedEnforcer.Enforce(role, path, method)
+}
+
+func convertApisToPolicies(apis []Api) [][]string {
+	policies := make([][]string, len(apis))
+	for i, api := range apis {
+		policies[i] = []string{api.Role, api.Path, api.Method}
+	}
+	return policies
 }
