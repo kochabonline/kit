@@ -23,12 +23,15 @@ func TestCasbin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.AddMenuPolicies([]Menu{
+	c.AddApiPolicies([]Api{
 		{Role: "alice2", Path: "/admin", Method: "GET"},
 		{Role: "alice2", Path: "/admin", Method: "POST"},
 	})
 	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice2")
+	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice")
+
+	t.Log(c.GetApiGroupingPolicies("admin"))
+	c.SyncedCachedEnforcer.AddRoleForUser("admin", "alice")
+	c.SyncedCachedEnforcer.AddPermissionForUser("alice", "/admin", "GET")
 	t.Log(c.Enforce("admin", "/admin", "GET"))
-	t.Log(c.GetMenuPolicies("alice"))
-	t.Log(c.GetMenuGroupingPolicies("admin"))
 }
