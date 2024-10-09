@@ -23,14 +23,14 @@ func TestCasbin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.AddApiPolicies([]Api{
+	c.AddPolicies([]Policy{
 		{Role: "alice2", Path: "/admin", Method: "GET"},
 		{Role: "alice2", Path: "/admin", Method: "POST"},
 	})
 	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice2")
 	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice")
 
-	t.Log(c.GetApiGroupingPolicies("admin"))
+	t.Log(c.GetGroupingPolicies("admin"))
 	c.SyncedCachedEnforcer.AddRoleForUser("admin", "alice")
 	c.SyncedCachedEnforcer.AddPermissionForUser("alice", "/admin", "GET")
 	t.Log(c.Enforce("admin", "/admin", "GET"))
