@@ -23,7 +23,7 @@ func TestCasbin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.AddPolicies([]Policy{
+	c.AddPolicies([]Rule{
 		{Role: "alice2", Path: "/admin", Method: "GET"},
 		{Role: "alice2", Path: "/admin", Method: "POST"},
 	})
@@ -34,4 +34,11 @@ func TestCasbin(t *testing.T) {
 	c.SyncedCachedEnforcer.AddRoleForUser("admin", "alice")
 	c.SyncedCachedEnforcer.AddPermissionForUser("alice", "/admin", "GET")
 	t.Log(c.Enforce("admin", "/admin", "GET"))
+	c.UpdatePolicies([]Rule{
+		{Role: "alice2", Path: "/admin", Method: "PUT"},
+		{Role: "alice", Path: "/admin", Method: "POST"},
+	}, []Rule{
+		{Role: "alice2", Path: "/admin", Method: "POST"},
+		{Role: "alice", Path: "/admin", Method: "DELETE"},
+	})
 }
