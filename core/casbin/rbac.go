@@ -1,9 +1,9 @@
 package casbin
 
 type Policy struct {
-	Role   string `json:"role"`
-	Path   string `json:"path"`
-	Method string `json:"method"`
+	Role   string `json:"role" validate:"required"`
+	Path   string `json:"path" validate:"required"`
+	Method string `json:"method" validate:"required"`
 }
 
 func convert(policies []Policy) [][]string {
