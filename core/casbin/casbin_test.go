@@ -1,7 +1,9 @@
 package casbin
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/kochabonline/kit/store/mysql"
 )
@@ -16,29 +18,32 @@ func TestCasbin(t *testing.T) {
 	}
 
 	c, err := New(Config{
-		DB:    m.Client,
-		Model: "./rbac_model.conf",
+		DB:         m.Client,
+		Model:      "./rbac_model.conf",
+		ExpireTime: 3,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer c.Close()
 
 	c.AddPolicies([]Rule{
-		{Role: "alice2", Path: "/admin", Method: "GET"},
-		{Role: "alice2", Path: "/admin", Method: "POST"},
+		{Role: "admin", Path: "/info", Method: "GET"},
+		{Role: "normal", Path: "/info/:id", Method: "GET"},
 	})
-	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice2")
-	c.SyncedCachedEnforcer.AddGroupingPolicy("admin", "alice")
-
-	t.Log(c.GetGroupingPolicies("admin"))
-	c.SyncedCachedEnforcer.AddRoleForUser("admin", "alice")
-	c.SyncedCachedEnforcer.AddPermissionForUser("alice", "/admin", "GET")
-	t.Log(c.Enforce("admin", "/admin", "GET"))
-	c.UpdatePolicies([]Rule{
-		{Role: "alice2", Path: "/admin", Method: "PUT"},
-		{Role: "alice", Path: "/admin", Method: "POST"},
-	}, []Rule{
-		{Role: "alice2", Path: "/admin", Method: "POST"},
-		{Role: "alice", Path: "/admin", Method: "DELETE"},
-	})
+	c.SyncedCachedEnforcer.AddRoleForUser("alice", "admin")
+	t.Log(c.GetGroupingPolicies("alice"))
+	t.Log(c.Enforce("alice", "/info/1", "GET"))
+	go func() {
+		c.SyncedCachedEnforcer.AddRoleForUser("alice", "normal")
+	}()
+	time.Sleep(5 * time.Second)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t.Log(c.GetGroupingPolicies("alice"))
+		t.Log(c.Enforce("alice", "/info/1", "GET"))
+	}()
+	wg.Wait()
 }

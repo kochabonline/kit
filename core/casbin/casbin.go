@@ -2,6 +2,7 @@ package casbin
 
 import (
 	"errors"
+	"time"
 
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
@@ -18,6 +19,10 @@ func New(config Config) (*Casbin, error) {
 	}
 
 	c := &Casbin{}
+	if err := config.init(); err != nil {
+		return nil, err
+	}
+
 	a, err := gormadapter.NewAdapterByDB(config.DB)
 	if err != nil {
 		return nil, err
@@ -27,7 +32,7 @@ func New(config Config) (*Casbin, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	c.SyncedCachedEnforcer.SetExpireTime(time.Duration(config.ExpireTime) * time.Second)
 	if err := c.SyncedCachedEnforcer.LoadPolicy(); err != nil {
 		return nil, err
 	}

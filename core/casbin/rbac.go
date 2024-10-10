@@ -24,7 +24,7 @@ func (c *Casbin) GetGroupingPolicies(g string) ([]Rule, error) {
 		return nil, err
 	}
 
-	var rules []Rule
+	rules := make([]Rule, 0, len(filter))
 	for _, v := range filter {
 		policies, err := c.GetPolicies(v[1])
 		if err != nil {
