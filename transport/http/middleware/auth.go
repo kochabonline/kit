@@ -42,8 +42,8 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 
 		result, err := config.Validate(c)
 		if err != nil {
-			log.Errorw("error", errors.Unauthorized(ErrAuthUnauthorized, err.Error()))
-			response.GinJSONError(c, errors.Unauthorized(ErrAuthUnauthorized, err.Error()))
+			log.Errorw("error", err.Error())
+			response.GinJSONError(c, err)
 			return
 		}
 		header := result[config.Header]

@@ -1,6 +1,7 @@
-package email
+package captcha
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestEmail(t *testing.T) {
+	ctx := context.Background()
 	r, _ := redis.NewClient(&redis.Config{
 		Password: "xxx",
 	})
@@ -27,13 +29,13 @@ func TestEmail(t *testing.T) {
 		Subject: "code",
 		Body:    fmt.Sprintf("xxx：%s", code),
 	}
-	ttl, err := email.Send(e, code)
+	ttl, err := email.Send(ctx, e, code)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("ttl:", ttl)
 
-	ok, err := email.Validate("xxx", "549899")
+	ok, err := email.Validate(ctx, "xxx", "549899")
 	if err != nil {
 		t.Fatal(err)
 	}

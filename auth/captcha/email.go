@@ -1,4 +1,4 @@
-package email
+package captcha
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/kochabonline/kit/errors"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -75,10 +74,10 @@ func (e *EmailAuthenticator) key(suffix string) string {
 	return fmt.Sprintf("%s:%s", e.prefix, suffix)
 }
 
-func (e *EmailAuthenticator) Send(email Email, code string) (time.Duration, error) {
+func (e *EmailAuthenticator) Send(ctx context.Context, email Email, code string) (time.Duration, error) {
 	key := e.key(email.To)
 
-	ttl, err := e.cache.GetTTL(key)
+	ttl, err := e.cache.GetTTL(ctx, key)
 	if err != nil {
 		return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache get ttl failed: %v", err)
 	}
@@ -86,29 +85,21 @@ func (e *EmailAuthenticator) Send(email Email, code string) (time.Duration, erro
 		return ttl, nil
 	}
 
-	eg, _ := errgroup.WithContext(context.Background())
-	eg.Go(func() error {
-		if err := e.cache.Set(key, code, e.expires); err != nil {
-			return errors.BadRequest(ErrEmailSendFailed, "email captcha cache set failed: %v", err)
-		}
-		err := smtp.SendMail(
-			e.smtpPlainAuth.addr(),
-			e.auth, e.smtpPlainAuth.Username,
-			[]string{email.To},
-			[]byte(buildEmailMessage(email)),
-		)
-		if err != nil {
-			if err := e.cache.Delete(key); err != nil {
-				return errors.BadRequest(ErrEmailSendFailed, "email captcha cache delete failed: %v", err)
-			}
-			return errors.BadRequest(ErrEmailSendFailed, "%v", err)
-		}
+	if err := e.cache.Set(ctx, key, code, e.expires); err != nil {
+		return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache set failed: %v", err)
+	}
 
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return 0, err
+	err = smtp.SendMail(
+		e.smtpPlainAuth.addr(),
+		e.auth, e.smtpPlainAuth.Username,
+		[]string{email.To},
+		[]byte(buildEmailMessage(email)),
+	)
+	if err != nil {
+		if err := e.cache.Delete(ctx, key); err != nil {
+			return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache delete failed: %v", err)
+		}
+		return 0, errors.BadRequest(ErrEmailSendFailed, "%v", err)
 	}
 
 	return 0, nil
@@ -126,16 +117,16 @@ func buildEmailMessage(email Email) string {
 	return builder.String()
 }
 
-func (e *EmailAuthenticator) Validate(email string, code string) (bool, error) {
+func (e *EmailAuthenticator) Validate(ctx context.Context, email string, code string) (bool, error) {
 	key := e.key(email)
 
-	v, err := e.cache.Get(key)
+	v, err := e.cache.Get(ctx, key)
 	if err != nil {
 		return false, errors.BadRequest(ErrEmailValidateFailed, "email captcha cache get failed: %v", err)
 	}
 
 	if v == code {
-		if err := e.cache.Delete(key); err != nil {
+		if err := e.cache.Delete(ctx, key); err != nil {
 			return false, errors.BadRequest(ErrEmailValidateFailed, "email captcha cache delete failed: %v", err)
 		}
 		return true, nil
