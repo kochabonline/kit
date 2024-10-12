@@ -1,14 +1,9 @@
 package jwt
 
 import (
-	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-)
-
-var (
-	ErrInvalidToken = errors.New("invalid token")
 )
 
 type Jwt struct {
@@ -16,14 +11,20 @@ type Jwt struct {
 }
 
 func New(config *Config) (*Jwt, error) {
-	jwt := &Jwt{}
-
-	if error := config.init(); error != nil {
-		return nil, error
+	if err := config.init(); err != nil {
+		return nil, err
 	}
-	jwt.config = config
+	return &Jwt{config: config}, nil
+}
 
-	return jwt, nil
+type Option struct {
+	jti string
+}
+
+func WithJti(jti string) func(*Option) {
+	return func(o *Option) {
+		o.jti = jti
+	}
 }
 
 func setClaim(claims map[string]any, key string, value any) {
@@ -32,7 +33,12 @@ func setClaim(claims map[string]any, key string, value any) {
 	}
 }
 
-func (j *Jwt) generate(claims jwt.MapClaims, expire int64) (string, error) {
+func (j *Jwt) generate(claims jwt.MapClaims, expire int64, opts ...func(*Option)) (string, error) {
+	option := &Option{}
+	for _, opt := range opts {
+		opt(option)
+	}
+
 	now := time.Now().Unix()
 
 	claims["exp"] = now + expire
@@ -45,17 +51,18 @@ func (j *Jwt) generate(claims jwt.MapClaims, expire int64) (string, error) {
 	setClaim(claims, "aud", j.config.Audience)
 	setClaim(claims, "iss", j.config.Issuer)
 	setClaim(claims, "sub", j.config.Subject)
+	setClaim(claims, "jti", option.jti)
 
 	token := jwt.NewWithClaims(j.config.signingMethod(), claims)
 	return token.SignedString([]byte(j.config.Secret))
 }
 
-func (j *Jwt) Generate(claims jwt.MapClaims) (string, error) {
-	return j.generate(claims, j.config.Expire)
+func (j *Jwt) Generate(claims jwt.MapClaims, opts ...func(*Option)) (string, error) {
+	return j.generate(claims, j.config.Expire, opts...)
 }
 
-func (j *Jwt) GenerateRefreshToken(claims jwt.MapClaims) (string, error) {
-	return j.generate(claims, j.config.RefreshExpire)
+func (j *Jwt) GenerateRefreshToken(claims jwt.MapClaims, opts ...func(*Option)) (string, error) {
+	return j.generate(claims, j.config.RefreshExpire, opts...)
 }
 
 func (j *Jwt) Parse(tokenString string) (jwt.MapClaims, error) {
@@ -66,22 +73,22 @@ func (j *Jwt) Parse(tokenString string) (jwt.MapClaims, error) {
 		return nil, err
 	}
 	if !token.Valid {
-		return nil, ErrInvalidToken
+		return nil, jwt.ErrTokenNotValidYet
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, ErrInvalidToken
+		return nil, jwt.ErrTokenInvalidClaims
 	}
 
 	return claims, nil
 }
 
-func (j *Jwt) Refresh(tokenString string) (string, error) {
+func (j *Jwt) Refresh(tokenString string, opts ...func(*Option)) (string, error) {
 	claims, err := j.Parse(tokenString)
 	if err != nil {
 		return "", err
 	}
 
-	return j.Generate(claims)
+	return j.Generate(claims, opts...)
 }
