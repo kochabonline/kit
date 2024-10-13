@@ -2,13 +2,24 @@ package jwt
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
+
+var (
+	ErrInvalidUserId = errors.New("invalid user id")
+)
+
+type Auth struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
 
 type JwtRedis struct {
 	jwt           *Jwt
@@ -83,42 +94,170 @@ func (r *JwtRedis) key(userId int64, key string) string {
 	return builder.String()
 }
 
-func (r *JwtRedis) getJti(claims jwt.MapClaims) string {
-	if jti, ok := claims["jti"].(string); ok {
-		return jti
+func (r *JwtRedis) getUserId(claims jwt.MapClaims) (int64, error) {
+	userId, ok := claims["userId"]
+	if !ok {
+		return 0, ErrInvalidUserId
 	}
 
-	return ""
+	switch v := userId.(type) {
+	case int64:
+		return v, nil
+	case float64:
+		return int64(v), nil
+	case string:
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return id, nil
+	default:
+		return 0, ErrInvalidUserId
+	}
 }
 
-func (r *JwtRedis) SetAccessJti(ctx context.Context, userId int64, jti string) error {
+// exists checks if jti exists in redis, used to determine if the token is valid
+func (r *JwtRedis) exists(ctx context.Context, userId int64, jtis ...string) bool {
 	if r.multipleLogin {
-		return r.client.Set(ctx, r.key(userId, jti), "", r.expire).Err()
+		keys := make([]string, len(jtis))
+		for i, jti := range jtis {
+			keys[i] = r.key(userId, jti)
+		}
+
+		result, err := r.client.Exists(ctx, keys...).Result()
+		if err != nil {
+			return false
+		}
+
+		return result == int64(len(jtis))
+	} else {
+		keys := []string{
+			r.key(userId, r.accessPrefix),
+			r.key(userId, r.refreshPrefix),
+		}
+		result, err := r.client.MGet(ctx, keys...).Result()
+		if err != nil {
+			return false
+		}
+
+		resultMap := make(map[string]struct{}, len(result))
+		for _, cmd := range result {
+			if cmd != nil {
+				resultMap[cmd.(string)] = struct{}{}
+			}
+		}
+
+		for _, jti := range jtis {
+			if _, exists := resultMap[jti]; exists {
+				return true
+			}
+		}
 	}
 
-	return r.client.Set(ctx, r.key(userId, r.accessPrefix), jti, r.expire).Err()
+	return false
 }
 
-func (r *JwtRedis) SetRefreshJti(ctx context.Context, userId int64, jti string) error {
-	if r.multipleLogin {
-		return r.client.Set(ctx, r.key(userId, jti), "", r.refreshExpire).Err()
+func (r *JwtRedis) Generate(ctx context.Context, claims jwt.MapClaims) (*Auth, error) {
+	userId, err := r.getUserId(claims)
+	if err != nil {
+		return nil, err
 	}
 
-	return r.client.Set(ctx, r.key(userId, r.refreshPrefix), jti, r.refreshExpire).Err()
+	aJti := uuid.New().String()
+	rJti := uuid.New().String()
+
+	aTokenString, err := r.jwt.Generate(claims, WithJti(aJti))
+	if err != nil {
+		return nil, err
+	}
+	rTokenString, err := r.jwt.GenerateRefreshToken(claims, WithJti(rJti))
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		if r.multipleLogin {
+			pipe.Set(ctx, r.key(userId, aJti), "", r.expire)
+			pipe.Set(ctx, r.key(userId, rJti), "", r.refreshExpire)
+		} else {
+			pipe.Set(ctx, r.key(userId, r.accessPrefix), aJti, r.expire)
+			pipe.Set(ctx, r.key(userId, r.refreshPrefix), rJti, r.refreshExpire)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Auth{
+		AccessToken:  aTokenString,
+		RefreshToken: rTokenString,
+	}, nil
 }
 
-func (r *JwtRedis) Get(ctx context.Context, userId int64, claims jwt.MapClaims) error {
-	jti := r.getJti(claims)
-	if jti == "" {
-		return jwt.ErrTokenInvalidId
+func (r *JwtRedis) Refresh(ctx context.Context, token string) (string, error) {
+	claims, err := r.jwt.Parse(token)
+	if err != nil {
+		return "", err
+	}
+
+	userId, err := r.getUserId(claims)
+	if err != nil {
+		return "", err
+	}
+
+	jti, err := GetJti(claims)
+	if err != nil {
+		return "", err
+	}
+
+	// jti does not exist in redis, indicating that the refresh token has expired
+	if exists := r.exists(ctx, userId, jti); !exists {
+		return "", jwt.ErrTokenExpired
+	}
+
+	newJti := uuid.New().String()
+	newToken, err := r.jwt.Generate(claims, WithJti(newJti))
+	if err != nil {
+		return "", err
 	}
 
 	if r.multipleLogin {
-		return r.client.Get(ctx, r.key(userId, jti)).Err()
+		return newToken, r.client.Set(ctx, r.key(userId, newJti), "", r.expire).Err()
 	}
 
-	return r.client.Get(ctx, r.key(userId, r.accessPrefix)).Err()
+	return newToken, r.client.Set(ctx, r.key(userId, r.accessPrefix), newJti, r.expire).Err()
+}
 
+func (r *JwtRedis) Parse(ctx context.Context, tokens ...string) error {
+	var err error
+	claims := make([]jwt.MapClaims, len(tokens))
+	for i, token := range tokens {
+		claims[i], err = r.jwt.Parse(token)
+		if err != nil {
+			return err
+		}
+	}
+
+	jtis := make([]string, len(claims))
+	for i, claim := range claims {
+		jti, err := GetJti(claim)
+		if err != nil {
+			return err
+		}
+		jtis[i] = jti
+	}
+
+	userId, err := r.getUserId(claims[0])
+	if err != nil {
+		return err
+	}
+
+	if exists := r.exists(ctx, userId, jtis...); !exists {
+		return jwt.ErrTokenExpired
+	}
+
+	return nil
 }
 
 func (r *JwtRedis) Delete(ctx context.Context, userId int64) error {
@@ -127,7 +266,7 @@ func (r *JwtRedis) Delete(ctx context.Context, userId int64) error {
 	var err error
 	for {
 		var scanKeys []string
-		scanKeys, cursor, err = r.client.Scan(ctx, cursor, r.key(userId, "*"), 100).Result()
+		scanKeys, cursor, err = r.client.Scan(ctx, cursor, r.key(userId, "*"), 10).Result()
 		if err != nil {
 			return err
 		}

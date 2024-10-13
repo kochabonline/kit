@@ -27,6 +27,14 @@ func WithJti(jti string) func(*Option) {
 	}
 }
 
+func GetJti(claims jwt.MapClaims) (string, error) {
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		return "", jwt.ErrTokenInvalidId
+	}
+	return jti, nil
+}
+
 func setClaim(claims map[string]any, key string, value any) {
 	if value != nil && value != "" && value != 0 {
 		claims[key] = value
