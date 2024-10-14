@@ -73,6 +73,8 @@ func (j *Jwt) GenerateRefreshToken(claims jwt.MapClaims, opts ...func(*Option)) 
 	return j.generate(claims, j.config.RefreshExpire, opts...)
 }
 
+// jwt.MapClaims is a type alias for map[string]interface{}
+// Numeric values are converted to float64 during JSON unmarshalling
 func (j *Jwt) Parse(tokenString string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.config.Secret), nil

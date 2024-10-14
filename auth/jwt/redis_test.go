@@ -49,18 +49,19 @@ func TestSingle(t *testing.T) {
 	t.Log("Access token:", auth.AccessToken)
 	t.Log("Refresh token:", auth.RefreshToken)
 
-	time.Sleep(5 * time.Second)
-	err = jwtRedis.Parse(ctx, auth.AccessToken)
+	time.Sleep(1 * time.Second)
+	_, err = jwtRedis.Parse(ctx, auth.AccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	newAccessToken, err := jwtRedis.Refresh(ctx, auth.RefreshToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("New access token:", newAccessToken)
 
-	err = jwtRedis.Parse(ctx, newAccessToken)
+	_, err = jwtRedis.Parse(ctx, newAccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}

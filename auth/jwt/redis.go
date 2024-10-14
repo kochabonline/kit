@@ -229,35 +229,38 @@ func (r *JwtRedis) Refresh(ctx context.Context, token string) (string, error) {
 	return newToken, r.client.Set(ctx, r.key(userId, r.accessPrefix), newJti, r.expire).Err()
 }
 
-func (r *JwtRedis) Parse(ctx context.Context, tokens ...string) error {
+func (r *JwtRedis) Parse(ctx context.Context, tokens ...string) (jwt.MapClaims, error) {
 	var err error
-	claims := make([]jwt.MapClaims, len(tokens))
+	claimsSlice := make([]jwt.MapClaims, len(tokens))
 	for i, token := range tokens {
-		claims[i], err = r.jwt.Parse(token)
+		claimsSlice[i], err = r.jwt.Parse(token)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	jtis := make([]string, len(claims))
-	for i, claim := range claims {
-		jti, err := GetJti(claim)
+	jtis := make([]string, len(claimsSlice))
+	for i, claims := range claimsSlice {
+		jti, err := GetJti(claims)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		jtis[i] = jti
 	}
 
-	userId, err := r.getUserId(claims[0])
+	// The fields in the token are the same except for jti and exp, so you can take the first claims
+	claims := claimsSlice[0]
+
+	userId, err := r.getUserId(claimsSlice[0])
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if exists := r.exists(ctx, userId, jtis...); !exists {
-		return jwt.ErrTokenExpired
+		return nil, jwt.ErrTokenExpired
 	}
 
-	return nil
+	return claims, nil
 }
 
 func (r *JwtRedis) Delete(ctx context.Context, userId int64) error {
