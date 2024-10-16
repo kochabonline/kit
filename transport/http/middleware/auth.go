@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport/http/response"
 )
 
@@ -27,7 +26,6 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 		// validate
 		result, err := config.Validate(c)
 		if err != nil {
-			log.Errorw("error", err.Error())
 			response.GinJSONError(c, err)
 			return
 		}

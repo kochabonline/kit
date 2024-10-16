@@ -23,7 +23,7 @@ type namespace struct {
 }
 
 type object struct {
-	ioc      Ioc
+	di       DependencyInjection
 	priority int
 }
 
@@ -92,10 +92,10 @@ func (s *Store) Init() error {
 		ns.sort()
 		objects := make([]string, 0, len(ns.object))
 		for _, obj := range ns.sorted {
-			if err := obj.ioc.Init(); err != nil {
+			if err := obj.di.Init(); err != nil {
 				return err
 			}
-			objects = append(objects, obj.ioc.Name())
+			objects = append(objects, obj.di.Name())
 		}
 		if len(objects) > 0 {
 			s.log.Infof("[ioc] | namespace: %s | objects: %v", ns.name, objects)
@@ -114,29 +114,33 @@ func (s *Store) RegisterNamespace(name string, priority int) {
 	s.log.Infof("[register] | namespace: %s | priority: %d", name, priority)
 }
 
-func (s *Store) Register(nsname string, ioc Ioc) {
+func (s *Store) Register(nsname string, di DependencyInjection, opts ...func(*Store)) {
+	for _, opt := range opts {
+		opt(s)
+	}
+
 	if _, ok := s.namespaces[nsname]; !ok {
-		s.log.Fatalf("register %s failed: namespace %s not found", ioc.Name(), nsname)
+		s.log.Fatalf("register %s failed: namespace %s not found", di.Name(), nsname)
 		return
 	}
 
 	priority := len(s.namespaces[nsname].object)
-	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: priority}
+	s.namespaces[nsname].object[di.Name()] = object{di: di, priority: priority}
 }
 
-func (s *Store) RegisterWithPriority(nsname string, ioc Ioc, priority int) {
+func (s *Store) RegisterWithPriority(nsname string, di DependencyInjection, priority int) {
 	if _, ok := s.namespaces[nsname]; !ok {
-		s.log.Fatalf("register %s failed: namespace %s not found", ioc.Name(), nsname)
+		s.log.Fatalf("register %s failed: namespace %s not found", di.Name(), nsname)
 		return
 	}
 
-	s.namespaces[nsname].object[ioc.Name()] = object{ioc: ioc, priority: priority}
+	s.namespaces[nsname].object[di.Name()] = object{di: di, priority: priority}
 }
 
-func (s *Store) Get(nsname string, name string) Ioc {
+func (s *Store) Get(nsname string, name string) DependencyInjection {
 	if ns, ok := s.namespaces[nsname]; ok {
 		if obj, ok := ns.object[name]; ok {
-			return obj.ioc
+			return obj.di
 		}
 	}
 
@@ -147,10 +151,10 @@ func (s *Store) GinIRouterRegister(r gin.IRouter) {
 	for _, ns := range s.namespaces {
 		routers := make([]string, 0, len(ns.object))
 		for _, obj := range ns.object {
-			if router, ok := obj.ioc.(GinIRouter); ok {
+			if router, ok := obj.di.(GinIRouter); ok {
 				router.Register(r)
 			}
-			routers = append(routers, obj.ioc.Name())
+			routers = append(routers, obj.di.Name())
 		}
 		if len(routers) > 0 {
 			s.log.Infof("[gin] | namespace: %s | routers: %v", ns.name, routers)

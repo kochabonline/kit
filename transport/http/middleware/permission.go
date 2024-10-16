@@ -22,8 +22,6 @@ type PermissionHPEConfig struct {
 	Param string
 	// SkippedRoles is a list of roles that should be skipped from permission
 	SkippedRoles []string
-	// Validate is a function that takes a gin context and returns the auth value
-	Validate func(c *gin.Context) (userId int64, userRole string, err error)
 }
 
 func PermissionHPE() gin.HandlerFunc {
@@ -42,24 +40,11 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 			return
 		}
 
-		var userId int64
-		var userRole string
-		var err error
-
-		if config.Validate == nil {
-			userId, userRole, err = userInfo(c)
-			if err != nil {
-				log.Errorw("error", err.Error())
-				response.GinJSONError(c, err)
-				return
-			}
-		} else {
-			userId, userRole, err = config.Validate(c)
-			if err != nil {
-				log.Errorw("error", err.Error())
-				response.GinJSONError(c, err)
-				return
-			}
+		userId, userRole, err := userInfo(c)
+		if err != nil {
+			log.Errorw("error", err.Error())
+			response.GinJSONError(c, err)
+			return
 		}
 
 		if findRoleWithEmpty(userRole, config.SkippedRoles...) {
@@ -80,8 +65,6 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 type PermissionVPEConfig struct {
 	// AllowRole is the role level that should be allowed to access
 	AllowedRoles []string
-	// Validate is a function that takes a gin context and returns the auth value
-	Validate func(c *gin.Context) (userId int64, userRole string, err error)
 }
 
 func PermissionAllow(roles ...string) gin.HandlerFunc {
@@ -92,24 +75,11 @@ func PermissionAllow(roles ...string) gin.HandlerFunc {
 
 func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var userId int64
-		var userRole string
-		var err error
-
-		if config.Validate == nil {
-			userId, userRole, err = userInfo(c)
-			if err != nil {
-				log.Errorw("error", err.Error())
-				response.GinJSONError(c, err)
-				return
-			}
-		} else {
-			userId, userRole, err = config.Validate(c)
-			if err != nil {
-				log.Errorw("error", err.Error())
-				response.GinJSONError(c, err)
-				return
-			}
+		userId, userRole, err := userInfo(c)
+		if err != nil {
+			log.Errorw("error", err.Error())
+			response.GinJSONError(c, err)
+			return
 		}
 
 		if !findRoleWithEmpty(userRole, config.AllowedRoles...) {

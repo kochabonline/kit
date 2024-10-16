@@ -2,7 +2,7 @@ package ioc
 
 import "github.com/gin-gonic/gin"
 
-type Ioc interface {
+type DependencyInjection interface {
 	Init() error
 	Name() string
 }

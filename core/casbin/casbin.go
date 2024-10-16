@@ -37,6 +37,12 @@ func New(config Config) (*Casbin, error) {
 		return nil, err
 	}
 
+	if config.Function != nil {
+		for k, v := range config.Function {
+			c.SyncedCachedEnforcer.AddFunction(k, v)
+		}
+	}
+
 	return c, nil
 }
 
