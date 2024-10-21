@@ -54,7 +54,7 @@ func NewConfig(option Option, opts ...ConfigOption) *Config {
 	}
 
 	if err := c.init(); err != nil {
-		c.log.Fatalf("default tag error: %s", err.Error())
+		c.log.Fatalf("failed to initialize config: %v", err)
 	}
 
 	for _, opt := range opts {
@@ -87,11 +87,11 @@ func (c *Config) viper() {
 
 func (c *Config) Read() error {
 	if err := viper.ReadInConfig(); err != nil {
-		return errors.Internal("config read error", err.Error())
+		return errors.Internal("failed to read config file: %v", err)
 	}
 
 	if err := viper.Unmarshal(&c.Option.Target); err != nil {
-		return errors.Internal("config unmarshal error", err.Error())
+		return errors.Internal("failed to unmarshal config: %v", err)
 	}
 
 	return nil

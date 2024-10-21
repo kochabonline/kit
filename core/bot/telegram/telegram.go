@@ -148,7 +148,7 @@ func (t *Telegram) receive(params ...string) (*ApiResponse[Update], error) {
 	}
 
 	if !response.Ok {
-		return nil, errors.New(response.ErrorCode, ErrorAPI, response.Description)
+		return nil, errors.New(response.ErrorCode, response.Description)
 	}
 
 	return &response, nil

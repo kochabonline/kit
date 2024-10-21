@@ -1,73 +1,73 @@
 package casbin
 
-type Rule struct {
+type Policy struct {
 	Role   string `json:"role" validate:"required"`
 	Path   string `json:"path" validate:"required"`
 	Method string `json:"method" validate:"required"`
 }
 
-type Policies struct {
-	Rules []Rule `json:"rules" validate:"required,dive"`
+type ApiPolicies struct {
+	Policies []Policy `json:"rules" validate:"required,dive"`
 }
 
-func convert(rules []Rule) [][]string {
-	r := make([][]string, len(rules))
-	for i, rule := range rules {
-		r[i] = []string{rule.Role, rule.Path, rule.Method}
+func convert(policies []Policy) [][]string {
+	p := make([][]string, len(policies))
+	for i, policy := range policies {
+		p[i] = []string{policy.Role, policy.Path, policy.Method}
 	}
-	return r
+	return p
 }
 
-func (c *Casbin) GetGroupingPolicies(g string) ([]Rule, error) {
+func (c *Casbin) GetGroupingPolicies(g string) ([]Policy, error) {
 	filter, err := c.SyncedCachedEnforcer.GetFilteredGroupingPolicy(0, g)
 	if err != nil {
 		return nil, err
 	}
 
-	rules := make([]Rule, 0, len(filter))
+	policies := make([]Policy, 0, len(filter))
 	for _, v := range filter {
-		policies, err := c.GetPolicies(v[1])
+		p, err := c.GetPolicies(v[1])
 		if err != nil {
 			return nil, err
 		}
-		rules = append(rules, policies...)
+		policies = append(policies, p...)
 	}
 
-	return rules, nil
+	return policies, nil
 }
 
-func (c *Casbin) GetPolicies(role string) ([]Rule, error) {
+func (c *Casbin) GetPolicies(role string) ([]Policy, error) {
 	filter, err := c.SyncedCachedEnforcer.GetFilteredPolicy(0, role)
 	if err != nil {
 		return nil, err
 	}
 
-	rules := make([]Rule, 0, len(filter))
-	for _, rule := range filter {
-		rules = append(rules, Rule{
-			Role:   rule[0],
-			Path:   rule[1],
-			Method: rule[2],
+	policies := make([]Policy, 0, len(filter))
+	for _, policy := range filter {
+		policies = append(policies, Policy{
+			Role:   policy[0],
+			Path:   policy[1],
+			Method: policy[2],
 		})
 	}
 
-	return rules, nil
+	return policies, nil
 }
 
-func (c *Casbin) AddPolicies(rules []Rule) (bool, error) {
-	r := convert(rules)
+func (c *Casbin) AddPolicies(policies []Policy) (bool, error) {
+	r := convert(policies)
 	return c.SyncedCachedEnforcer.AddPolicies(r)
 }
 
-func (c *Casbin) RemovePolicies(rules []Rule) (bool, error) {
-	r := convert(rules)
+func (c *Casbin) RemovePolicies(policies []Policy) (bool, error) {
+	r := convert(policies)
 	return c.SyncedCachedEnforcer.RemovePolicies(r)
 }
 
-func (c *Casbin) UpdatePolicies(oldRules []Rule, newRules []Rule) (bool, error) {
-	oldPolicies := convert(oldRules)
-	newPolicies := convert(newRules)
-	return c.SyncedCachedEnforcer.UpdatePolicies(oldPolicies, newPolicies)
+func (c *Casbin) UpdatePolicies(oldPolicies []Policy, newPolicies []Policy) (bool, error) {
+	old := convert(oldPolicies)
+	new := convert(newPolicies)
+	return c.SyncedCachedEnforcer.UpdatePolicies(old, new)
 }
 
 func (c *Casbin) Enforce(role string, path, method string) (bool, error) {

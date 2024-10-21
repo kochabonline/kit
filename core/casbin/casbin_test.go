@@ -27,7 +27,7 @@ func TestCasbin(t *testing.T) {
 	}
 	defer c.Close()
 
-	c.AddPolicies([]Rule{
+	c.AddPolicies([]Policy{
 		{Role: "admin", Path: "/info", Method: "GET"},
 		{Role: "normal", Path: "/info/:id", Method: "GET"},
 	})

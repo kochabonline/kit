@@ -10,11 +10,6 @@ import (
 	"github.com/kochabonline/kit/errors"
 )
 
-const (
-	ErrEmailSendFailed     = "email send failed"
-	ErrEmailValidateFailed = "email validate failed"
-)
-
 type Email struct {
 	To      string
 	Subject string
@@ -79,14 +74,14 @@ func (e *EmailAuthenticator) Send(ctx context.Context, email Email, code string)
 
 	ttl, err := e.cache.GetTTL(ctx, key)
 	if err != nil {
-		return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache get ttl failed: %v", err)
+		return 0, errors.BadRequest("email captcha cache get ttl failed: %v", err)
 	}
 	if ttl > 0 {
 		return ttl, nil
 	}
 
 	if err := e.cache.Set(ctx, key, code, e.expires); err != nil {
-		return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache set failed: %v", err)
+		return 0, errors.BadRequest("email captcha cache set failed: %v", err)
 	}
 
 	err = smtp.SendMail(
@@ -97,9 +92,9 @@ func (e *EmailAuthenticator) Send(ctx context.Context, email Email, code string)
 	)
 	if err != nil {
 		if err := e.cache.Delete(ctx, key); err != nil {
-			return 0, errors.BadRequest(ErrEmailSendFailed, "email captcha cache delete failed: %v", err)
+			return 0, errors.BadRequest("email captcha cache delete failed: %v", err)
 		}
-		return 0, errors.BadRequest(ErrEmailSendFailed, "%v", err)
+		return 0, errors.BadRequest("email captcha send failed: %v", err)
 	}
 
 	return 0, nil
@@ -122,12 +117,12 @@ func (e *EmailAuthenticator) Validate(ctx context.Context, email string, code st
 
 	v, err := e.cache.Get(ctx, key)
 	if err != nil {
-		return false, errors.BadRequest(ErrEmailValidateFailed, "email captcha cache get failed: %v", err)
+		return false, errors.BadRequest("email captcha cache get failed: %v", err)
 	}
 
 	if v == code {
 		if err := e.cache.Delete(ctx, key); err != nil {
-			return false, errors.BadRequest(ErrEmailValidateFailed, "email captcha cache delete failed: %v", err)
+			return false, errors.BadRequest("email captcha cache delete failed: %v", err)
 		}
 		return true, nil
 	}

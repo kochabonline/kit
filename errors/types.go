@@ -1,45 +1,45 @@
 package errors
 
-func BadRequest(reason, format string, args ...any) *Error {
-	return New(400, reason, format, args...)
+func BadRequest(format string, args ...any) *Error {
+	return New(400, format, args...)
 }
 
-func Unauthorized(reason, format string, args ...any) *Error {
-	return New(401, reason, format, args...)
+func Unauthorized(format string, args ...any) *Error {
+	return New(401, format, args...)
 }
 
-func Forbidden(reason, format string, args ...any) *Error {
-	return New(403, reason, format, args...)
+func Forbidden(format string, args ...any) *Error {
+	return New(403, format, args...)
 }
 
-func NotFound(reason, format string, args ...any) *Error {
-	return New(404, reason, format, args...)
+func NotFound(format string, args ...any) *Error {
+	return New(404, format, args...)
 }
 
-func MethodNotAllowed(reason, format string, args ...any) *Error {
-	return New(405, reason, format, args...)
+func MethodNotAllowed(format string, args ...any) *Error {
+	return New(405, format, args...)
 }
 
-func RequestTimeout(reason, format string, args ...any) *Error {
-	return New(408, reason, format, args...)
+func RequestTimeout(format string, args ...any) *Error {
+	return New(408, format, args...)
 }
 
-func TooManyRequests(reason, format string, args ...any) *Error {
-	return New(429, reason, format, args...)
+func TooManyRequests(format string, args ...any) *Error {
+	return New(429, format, args...)
 }
 
-func Internal(reason, format string, args ...any) *Error {
-	return New(500, reason, format, args...)
+func Internal(format string, args ...any) *Error {
+	return New(500, format, args...)
 }
 
-func NotImplemented(reason, format string, args ...any) *Error {
-	return New(501, reason, format, args...)
+func NotImplemented(format string, args ...any) *Error {
+	return New(501, format, args...)
 }
 
-func ServiceUnavailable(reason, format string, args ...any) *Error {
-	return New(503, reason, format, args...)
+func ServiceUnavailable(format string, args ...any) *Error {
+	return New(503, format, args...)
 }
 
-func GatewayTimeout(reason, format string, args ...any) *Error {
-	return New(504, reason, format, args...)
+func GatewayTimeout(format string, args ...any) *Error {
+	return New(504, format, args...)
 }

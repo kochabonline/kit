@@ -53,8 +53,8 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 		}
 
 		if paramValue != strconv.FormatInt(userId, 10) {
-			log.Errorw("userId", userId, "error", errors.Forbidden(ErrPermissionForbidden, "%d is not allowed to access %s", userId, paramValue))
-			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden, "%d is not allowed to access %s", userId, paramValue))
+			log.Errorw("userId", userId, "error", errors.Forbidden("%d is not allowed to access %s", userId, paramValue))
+			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
 
@@ -83,8 +83,8 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 		}
 
 		if !findRoleWithEmpty(userRole, config.AllowedRoles...) {
-			log.Errorw("userId", userId, "userRole", userRole, "error", errors.Forbidden(ErrPermissionForbidden, "%s is not allowed to access", userRole))
-			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden, "%s is not allowed to access", userRole))
+			log.Errorw("userId", userId, "userRole", userRole, "error", errors.Forbidden("%s is not allowed to access", userRole))
+			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
 

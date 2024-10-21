@@ -8,16 +8,16 @@ import (
 )
 
 type Response struct {
-	Code   int    `json:"code"`
-	Reason string `json:"reason,omitempty"`
-	Data   any    `json:"data,omitempty"`
+	Code    int    `json:"code"`
+	Message string `json:"message,omitempty"`
+	Data    any    `json:"data,omitempty"`
 }
 
-func NewResponse(code int, reason string, data any) *Response {
+func NewResponse(code int, message string, data any) *Response {
 	return &Response{
-		Code:   code,
-		Reason: reason,
-		Data:   data,
+		Code:    code,
+		Message: message,
+		Data:    data,
 	}
 }
 
@@ -48,5 +48,5 @@ func GinJSONError(c *gin.Context, err error) {
 		httpCode = http.StatusInternalServerError
 	}
 
-	c.JSON(httpCode, NewResponse(int(e.Code), e.Reason, nil))
+	c.JSON(httpCode, NewResponse(int(e.Code), e.Message, nil))
 }

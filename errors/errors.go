@@ -6,8 +6,7 @@ import (
 )
 
 const (
-	UnknownCode   = 500
-	UnknownReason = ""
+	UnknownCode = 500
 )
 
 type Error struct {
@@ -17,7 +16,7 @@ type Error struct {
 
 // Error returns the string representation of the error message.
 func (e *Error) Error() string {
-	return fmt.Sprintf("code=%d reason=%s message=%s metadata=%v cause=%v", e.Code, e.Reason, e.Message, e.Metadata, e.cause)
+	return fmt.Sprintf("code=%d message=%s metadata=%v cause=%v", e.Code, e.Message, e.Metadata, e.cause)
 }
 
 // Unwrap returns the cause of the error
@@ -44,18 +43,17 @@ func (e *Error) WithCause(cause error) *Error {
 // Is reports whether err is an *Error with the same code and reason.
 func (e *Error) Is(err error) bool {
 	if ge := new(Error); errors.As(err, &ge) {
-		return e.Code == ge.Code && e.Reason == ge.Reason
+		return e.Code == ge.Code && e.Message == ge.Message
 	}
 
 	return false
 }
 
-// New returns an error representing c, r, and m.
-func New(code int, reason, format string, args ...any) *Error {
+// New returns an *Error representing the given code and message.
+func New(code int, format string, args ...any) *Error {
 	return &Error{
 		Status: Status{
 			Code:    int32(code),
-			Reason:  reason,
 			Message: fmt.Sprintf(format, args...),
 		},
 	}
@@ -75,7 +73,6 @@ func Clone(err *Error) *Error {
 	return &Error{
 		Status: Status{
 			Code:     err.Code,
-			Reason:   err.Reason,
 			Message:  err.Message,
 			Metadata: metadata,
 		},
@@ -92,5 +89,5 @@ func FromError(err error) *Error {
 		return ge
 	}
 
-	return New(UnknownCode, UnknownReason, err.Error())
+	return New(UnknownCode, err.Error())
 }

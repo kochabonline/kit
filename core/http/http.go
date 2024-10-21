@@ -10,10 +10,6 @@ import (
 )
 
 const (
-	ErrBadRequest = "http request failed"
-)
-
-const (
 	MethodGet     = "GET"
 	MethodHead    = "HEAD"
 	MethodPost    = "POST"
@@ -116,7 +112,7 @@ func (h *Http) Request(method, url string, body io.Reader, opts ...func(*Request
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.BadRequest(ErrBadRequest, string(respByte))
+		return errors.BadRequest(string(respByte))
 	}
 
 	if opt.response != nil {
