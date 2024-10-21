@@ -6,7 +6,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	err := New(401, "reason", "message")
+	err := New(401, "message")
 	err2 := err.WithMetadata(map[string]string{"foo": "bar"}).WithMetadata(map[string]string{"bar": "baz"})
 	err3 := err2.WithCause(errors.New("cause"))
 

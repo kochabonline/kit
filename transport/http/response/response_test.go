@@ -26,7 +26,7 @@ func TestGinJsonWithError(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	GinJSONError(c, errors.New(10000, "test error", "test reason"))
+	GinJSONError(c, errors.New(10000, "test reason"))
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":400`)
