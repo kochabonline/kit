@@ -13,18 +13,15 @@ const (
 )
 
 type CasbinConfig struct {
+	// SkippedPathPrefixes is a list of path prefixes that should be skipped from casbin
+	SkippedPathPrefixes []string
+	// E is the casbin synced cached enforcer
 	E *casbin.SyncedCachedEnforcer
-}
-
-func Casbin(e *casbin.SyncedCachedEnforcer) gin.HandlerFunc {
-	return CasbinWithConfig(CasbinConfig{
-		E: e,
-	})
 }
 
 func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if config.E == nil {
+		if config.E == nil || skippedPathPrefixes(c, config.SkippedPathPrefixes...) {
 			c.Next()
 			return
 		}

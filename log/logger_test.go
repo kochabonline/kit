@@ -38,7 +38,9 @@ func TestLogf(t *testing.T) {
 func TestLogw(t *testing.T) {
 	h := NewHelper(zerolog.New().With().HelperCaller().Logger())
 	h.Debugw("key", "value")
-	h.Errorw("error", errors.New(400, "test"))
+	err := errors.New(400, "test")
+	h.Errorw("error", err)
+	
 
 	s := NewHelper(slog.New().With().HelperCaller().Logger())
 	s.Debugw("test message", "key", "value")
