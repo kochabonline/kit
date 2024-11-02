@@ -116,8 +116,7 @@ func (h *Http) Request(method, url string, body io.Reader, opts ...func(*Request
 	}
 
 	if opt.response != nil {
-		err = json.Unmarshal(respByte, &opt.response)
-		if err != nil {
+		if err = json.Unmarshal(respByte, &opt.response); err != nil {
 			return err
 		}
 	}

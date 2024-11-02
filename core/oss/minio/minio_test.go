@@ -35,7 +35,7 @@ func TestUpload(t *testing.T) {
 
 	params := &UploadInput{
 		Bucket:  "test",
-		Object:  "c.jpeg",
+		Object:  "uTools-5.2.0.exe",
 		Expires: 3600,
 	}
 

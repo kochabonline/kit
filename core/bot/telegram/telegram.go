@@ -11,32 +11,26 @@ import (
 
 	"github.com/kochabonline/kit/core/bot"
 	"github.com/kochabonline/kit/errors"
-	"github.com/kochabonline/kit/log"
 )
 
 var _ bot.HttpClient = (*Telegram)(nil)
 
 type Telegram struct {
-	Api   string `json:"api"`
 	Token string `json:"token"`
 
-	client *http.Client
-
+	api      string
+	client   *http.Client
 	shutdown chan struct{}
-	chatId   int64
+
+	handleCommandsChatId  int64
+	handleCommandsErrChan chan error
 }
 
 type Option func(*Telegram)
 
 func WithApi(api string) Option {
 	return func(d *Telegram) {
-		d.Api = api
-	}
-}
-
-func WithToken(token string) Option {
-	return func(d *Telegram) {
-		d.Token = token
+		d.api = api
 	}
 }
 
@@ -46,16 +40,22 @@ func WithClient(client *http.Client) Option {
 	}
 }
 
-func WithChatId(chatId int64) Option {
+func WithHandleCommandsChatId(chatId int64) Option {
 	return func(d *Telegram) {
-		d.chatId = chatId
+		d.handleCommandsChatId = chatId
+	}
+}
+
+func WithHandleCommandsErrChan(ch chan error) Option {
+	return func(d *Telegram) {
+		d.handleCommandsErrChan = ch
 	}
 }
 
 func New(token string, opts ...Option) *Telegram {
 	d := &Telegram{
-		Api:      API,
 		Token:    token,
+		api:      API,
 		client:   http.DefaultClient,
 		shutdown: make(chan struct{}, 1),
 	}
@@ -78,8 +78,8 @@ func NewPool(token string, opts ...Option) *Telegram {
 	}
 
 	d := &Telegram{
-		Api:   API,
 		Token: token,
+		api:   API,
 		client: &http.Client{
 			Transport: transport,
 		},
@@ -154,10 +154,10 @@ func (t *Telegram) receive(params ...string) (*ApiResponse[Update], error) {
 	return &response, nil
 }
 
-func (t *Telegram) process(update Update, fn func() string) {
+func (t *Telegram) process(update Update, fn func() string) error {
 	// only process commands from the same chat
-	if t.chatId != 0 && t.chatId != update.Message.Chat.ID {
-		return
+	if t.handleCommandsChatId != 0 && t.handleCommandsChatId != update.Message.Chat.ID {
+		return nil
 	}
 
 	resp, err := t.Send(&SendMessage{
@@ -167,14 +167,16 @@ func (t *Telegram) process(update Update, fn func() string) {
 		ReplyToMessageId: update.Message.MessageID,
 	})
 	if err != nil {
-		log.Errorf("Telegram failed to send message: %v", err)
+		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Errorf("Telegram failed to send message: %s", resp.Status)
+		return fmt.Errorf("Telegram failed to send message: %s", resp.Status)
 	}
+
+	return nil
 }
 
-func (t *Telegram) HandleCommands() error {
+func (t *Telegram) HandleCommands() {
 	updatesChan := make(chan Update)
 
 	// get updates
@@ -187,8 +189,8 @@ func (t *Telegram) HandleCommands() error {
 				return
 			case <-time.After(500 * time.Microsecond):
 				updates, err := t.receive("offset", fmt.Sprintf("%d", offset))
-				if err != nil {
-					log.Errorf("Telegram failed to get updates: %v", err)
+				if err != nil && t.handleCommandsErrChan != nil {
+					t.handleCommandsErrChan <- fmt.Errorf("Telegram failed to get updates: %v", err)
 				}
 				if len(updates.Result) > 0 {
 					for _, update := range updates.Result {
@@ -204,15 +206,15 @@ func (t *Telegram) HandleCommands() error {
 	go func(botCommand *Store) {
 		for update := range updatesChan {
 			cmd, ok := botCommand.getCommand(update.Message.BotCommand())
-			if !ok {
-				log.Infof("Telegram received unknown command: %s", update.Message.BotCommand())
+			if !ok && t.handleCommandsErrChan != nil {
+				t.handleCommandsErrChan <- fmt.Errorf("Telegram received unknown command: %s", update.Message.BotCommand())
 				continue
 			}
-			t.process(update, cmd)
+			if err := t.process(update, cmd); err != nil && t.handleCommandsErrChan != nil {
+				t.handleCommandsErrChan <- err
+			}
 		}
 	}(BotCommand)
-
-	return nil
 }
 
 func (t *Telegram) Close() {

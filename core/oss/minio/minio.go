@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"mime"
+	"net/http"
 	"net/url"
 	"path"
 	"sort"
@@ -16,8 +17,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Minio is a wrapper around minio-go/v7 package.
+// https://min.io/docs/minio/linux/reference/s3-api-compatibility.html
+
 const (
 	minPartSize = 5 * 1024 * 1024
+	maxPartSize = 5 * 1024 * 1024 * 1024
 )
 
 type Minio struct {
@@ -125,11 +130,7 @@ func (m *Minio) Upload(ctx context.Context, params *UploadInput) (UploadOutput, 
 		return UploadOutput{Uploaded: true}, nil
 	}
 
-	urlValues := url.Values{
-		"partNumber": {"1"},
-	}
-
-	presignUrl, err := m.Core.Presign(ctx, "PUT", params.Bucket, params.Object, time.Duration(params.Expires)*time.Second, urlValues)
+	presignUrl, err := m.Core.PresignedPutObject(ctx, params.Bucket, params.Object, time.Duration(params.Expires)*time.Second)
 	if err != nil {
 		return output, err
 	}
@@ -142,8 +143,8 @@ func (m *Minio) Upload(ctx context.Context, params *UploadInput) (UploadOutput, 
 func (m *Minio) CreateMultipartUpload(ctx context.Context, params *CreateMultipartUploadInput) (CreateMultipartUploadOutput, error) {
 	var output CreateMultipartUploadOutput
 
-	if params.PartSize < minPartSize {
-		return output, fmt.Errorf("part size must be at least %d bytes", minPartSize)
+	if params.PartSize < minPartSize || params.PartSize > maxPartSize {
+		return output, fmt.Errorf("part size must be between %d and %d bytes", minPartSize, maxPartSize)
 	}
 
 	if _, err := m.Core.StatObject(ctx, params.Bucket, params.Object, minio.StatObjectOptions{}); err == nil {
@@ -169,7 +170,7 @@ func (m *Minio) CreateMultipartUpload(ctx context.Context, params *CreateMultipa
 	partInfos := m.sharding(params.ObjectSize, params.PartSize)
 	partInfoChan := make(chan PartInfo, len(partInfos))
 
-	sem := make(chan struct{}, m.semaphore)
+	sem := make(chan struct{}, m.semaphore) // semaphore to limit the number of concurrent goroutines
 	for _, partInfo := range partInfos {
 		if _, ok := listIncompleteUploads.Uploads[partInfo.PartNumber]; ok {
 			continue
@@ -185,7 +186,7 @@ func (m *Minio) CreateMultipartUpload(ctx context.Context, params *CreateMultipa
 				"partNumber": {strconv.Itoa(partInfo.PartNumber)},
 			}
 
-			partUrl, err := m.Core.Presign(ctx, "PUT", params.Bucket, params.Object, time.Duration(params.Expires)*time.Second, urlValues)
+			partUrl, err := m.Core.Presign(ctx, http.MethodPut, params.Bucket, params.Object, time.Duration(params.Expires)*time.Second, urlValues)
 			if err != nil {
 				return err
 			}
@@ -250,6 +251,7 @@ func (m *Minio) AbortMultipartUpload(ctx context.Context, params *AbortMultipart
 	return m.Core.AbortMultipartUpload(ctx, params.Bucket, params.Object, params.UploadId)
 }
 
+// contextType returns the content type of an object
 func (m *Minio) contextType(objectName string) string {
 	if contentType := mime.TypeByExtension(path.Ext(objectName)); contentType != "" {
 		return contentType
@@ -257,6 +259,7 @@ func (m *Minio) contextType(objectName string) string {
 	return "application/octet-stream"
 }
 
+// sharding splits an object into parts
 func (m *Minio) sharding(objectSize, partSize uint64) []PartInfo {
 	partCount := int(math.Ceil(float64(objectSize) / float64(partSize)))
 	partInfos := make([]PartInfo, 0, partCount)
