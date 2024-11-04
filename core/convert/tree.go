@@ -1,14 +1,14 @@
-package tools
+package convert
 
 type Node interface {
-	GetId() int
-	GetParentId() int
+	GetId() int64
+	GetParentId() int64
 	GetNode() Node
 	SetChildren(children []Node)
 }
 
-func buildNodeMap(nodes []Node) map[int][]Node {
-	nodeMap := make(map[int][]Node, len(nodes))
+func buildNodeMap(nodes []Node) map[int64][]Node {
+	nodeMap := make(map[int64][]Node, len(nodes))
 	for _, node := range nodes {
 		parentId := node.GetParentId()
 		nodeMap[parentId] = append(nodeMap[parentId], node)
@@ -16,7 +16,7 @@ func buildNodeMap(nodes []Node) map[int][]Node {
 	return nodeMap
 }
 
-func buildTree(nodeMap map[int][]Node, parentId int) []Node {
+func buildTree(nodeMap map[int64][]Node, parentId int64) []Node {
 	children, exists := nodeMap[parentId]
 	if !exists {
 		return []Node{}
@@ -32,7 +32,7 @@ func buildTree(nodeMap map[int][]Node, parentId int) []Node {
 	return tree
 }
 
-func BuildTree(nodes []Node, parentId int) []Node {
+func BuildTree(nodes []Node, parentId int64) []Node {
 	nodeMap := buildNodeMap(nodes)
 	return buildTree(nodeMap, parentId)
 }

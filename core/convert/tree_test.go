@@ -1,4 +1,4 @@
-package tools
+package convert
 
 import (
 	"encoding/json"
@@ -6,17 +6,17 @@ import (
 )
 
 type TreeMock struct {
-	Id       int
-	ParentId int
+	Id       int64
+	ParentId int64
 	Title    string
 	Children []*TreeMock
 }
 
-func (t *TreeMock) GetId() int {
+func (t *TreeMock) GetId() int64 {
 	return t.Id
 }
 
-func (t *TreeMock) GetParentId() int {
+func (t *TreeMock) GetParentId() int64 {
 	return t.ParentId
 }
 
