@@ -7,6 +7,14 @@ type Node interface {
 	SetChildren(children []Node)
 }
 
+func ConvertToNodeSlice[T Node](data []T) []Node {
+	nodes := make([]Node, len(data))
+	for i, d := range data {
+		nodes[i] = d
+	}
+	return nodes
+}
+
 func buildNodeMap(nodes []Node) map[int64][]Node {
 	nodeMap := make(map[int64][]Node, len(nodes))
 	for _, node := range nodes {
@@ -22,12 +30,12 @@ func buildTree(nodeMap map[int64][]Node, parentId int64) []Node {
 		return []Node{}
 	}
 
-	tree := make([]Node, 0, len(children))
-	for _, child := range children {
+	tree := make([]Node, len(children))
+	for i, child := range children {
 		childNode := child.GetNode()
 		childId := child.GetId()
 		childNode.SetChildren(buildTree(nodeMap, childId))
-		tree = append(tree, childNode)
+		tree[i] = childNode
 	}
 	return tree
 }

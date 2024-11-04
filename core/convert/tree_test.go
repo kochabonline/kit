@@ -41,11 +41,7 @@ func TestBuildTree(t *testing.T) {
 		{Id: 6, ParentId: 5, Title: "2.1.1"},
 	}
 
-	nodes := make([]Node, len(data))
-	for i, d := range data {
-		nodes[i] = d
-	}
-	tree := BuildTree(nodes, 0)
+	tree := BuildTree(ConvertToNodeSlice(data), 3)
 	bytes, err := json.MarshalIndent(tree, "", "  ")
 	if err != nil {
 		t.Error(err)
