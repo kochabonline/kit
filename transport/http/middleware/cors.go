@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/core/tools"
+	"github.com/kochabonline/kit/core/tools/slice"
 )
 
 type CorsConfig struct {
@@ -32,7 +32,7 @@ func Cors() gin.HandlerFunc {
 func CorsWithConfig(config CorsConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		if !tools.Contains(origin, config.AllowOrigins) {
+		if !slice.Contains(origin, config.AllowOrigins) {
 			c.Next()
 			return
 		}
