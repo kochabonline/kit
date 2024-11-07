@@ -68,3 +68,17 @@ func Contains[T comparable](a T, list []T) bool {
 	_, found := set[a]
 	return found
 }
+
+// RemoveDuplicate removes duplicate values from a list.
+func RemoveDuplicate[T comparable](list []T) []T {
+	set := make(map[T]struct{}, len(list))
+	for _, item := range list {
+		set[item] = struct{}{}
+	}
+
+	result := make([]T, 0, len(set))
+	for item := range set {
+		result = append(result, item)
+	}
+	return result
+}

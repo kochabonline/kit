@@ -1,9 +1,9 @@
 package convert
 
 type Node interface {
+	GetNode() Node
 	GetId() int64
 	GetParentId() int64
-	GetNode() Node
 	SetChildren(children []Node)
 }
 
