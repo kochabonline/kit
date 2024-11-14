@@ -10,16 +10,21 @@ import (
 type Store struct {
 	namespaces map[string]namespace
 	sorted     []*namespace
-	log        *log.Helper
 }
 
-type Option func(*Store)
+type StoreOption func(*Store)
+
+func WithNamespaces(namespaces map[string]namespace) StoreOption {
+	return func(s *Store) {
+		s.namespaces = namespaces
+	}
+}
 
 type namespace struct {
 	name     string
 	object   map[string]object
-	priority int
 	sorted   []*object
+	priority int
 }
 
 type object struct {
@@ -27,13 +32,7 @@ type object struct {
 	priority int
 }
 
-func WithNamespaces(namespaces map[string]namespace) Option {
-	return func(s *Store) {
-		s.namespaces = namespaces
-	}
-}
-
-func NewStore(opts ...Option) *Store {
+func NewStore(opts ...StoreOption) *Store {
 	store := &Store{
 		namespaces: make(map[string]namespace),
 	}
@@ -69,20 +68,16 @@ func (n *namespace) sort() {
 	})
 }
 
-func (s *Store) findNsMinPriority() int {
-	minPriority := int(^uint(0) >> 1)
+func (s *Store) min() int {
+	min := int(^uint(0) >> 1)
 
 	for _, ns := range s.namespaces {
-		if ns.priority < minPriority {
-			minPriority = ns.priority
+		if ns.priority < min {
+			min = ns.priority
 		}
 	}
 
-	return minPriority
-}
-
-func (s *Store) SetLogger(log *log.Helper) {
-	s.log = log
+	return min
 }
 
 func (s *Store) Init() error {
@@ -98,29 +93,31 @@ func (s *Store) Init() error {
 			objects = append(objects, obj.di.Name())
 		}
 		if len(objects) > 0 {
-			s.log.Infof("[ioc] | namespace: %s | objects: %v", ns.name, objects)
+			log.Infof("[ioc] | namespace: %s | objects: %v", ns.name, objects)
 		}
 	}
 
 	return nil
 }
 
-func (s *Store) RegisterNamespace(name string, priority int) {
-	if priority <= s.findNsMinPriority() {
-		priority = s.findNsMinPriority() + 1
+func (s *Store) RegisterNamespace(name string) {
+	priority := len(s.namespaces)
+	s.namespaces[name] = namespace{name: name, object: map[string]object{}, priority: priority}
+	log.Infof("[register] | namespace: %s | priority: %d", name, priority)
+}
+
+func (s *Store) RegisterNamespaceWithPriority(name string, priority int) {
+	if priority <= s.min() {
+		priority = s.min() + 1
 	}
 
 	s.namespaces[name] = namespace{name: name, object: map[string]object{}, priority: priority}
-	s.log.Infof("[register] | namespace: %s | priority: %d", name, priority)
+	log.Infof("[register] | namespace: %s | priority: %d", name, priority)
 }
 
-func (s *Store) Register(nsname string, di DependencyInjection, opts ...func(*Store)) {
-	for _, opt := range opts {
-		opt(s)
-	}
-
+func (s *Store) Register(nsname string, di DependencyInjection) {
 	if _, ok := s.namespaces[nsname]; !ok {
-		s.log.Fatalf("register %s failed: namespace %s not found", di.Name(), nsname)
+		log.Fatalf("register %s failed: namespace %s not found", di.Name(), nsname)
 		return
 	}
 
@@ -130,7 +127,7 @@ func (s *Store) Register(nsname string, di DependencyInjection, opts ...func(*St
 
 func (s *Store) RegisterWithPriority(nsname string, di DependencyInjection, priority int) {
 	if _, ok := s.namespaces[nsname]; !ok {
-		s.log.Fatalf("register %s failed: namespace %s not found", di.Name(), nsname)
+		log.Fatalf("register %s failed: namespace %s not found", di.Name(), nsname)
 		return
 	}
 
@@ -157,7 +154,7 @@ func (s *Store) GinIRouterRegister(r gin.IRouter) {
 			routers = append(routers, obj.di.Name())
 		}
 		if len(routers) > 0 {
-			s.log.Infof("[gin] | namespace: %s | routers: %v", ns.name, routers)
+			log.Infof("[gin] | namespace: %s | routers: %v", ns.name, routers)
 		}
 	}
 }

@@ -1,9 +1,5 @@
 package ioc
 
-import (
-	"github.com/kochabonline/kit/log"
-)
-
 const (
 	ConfigNamespace     = "config"
 	DataBaseNamespace   = "database"
@@ -20,5 +16,4 @@ func init() {
 		HandlerNamespace:    {name: HandlerNamespace, object: map[string]object{}, priority: -7},
 		ControllerNamespace: {name: ControllerNamespace, object: map[string]object{}, priority: -6},
 	}))
-	Container.SetLogger(log.DefaultLogger)
 }

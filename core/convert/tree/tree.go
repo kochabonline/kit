@@ -1,10 +1,16 @@
-package convert
+package tree
+
+import "sort"
 
 type Node interface {
 	GetNode() Node
 	GetId() int64
 	GetParentId() int64
 	SetChildren(children []Node)
+}
+
+type Sortable interface {
+	GetOrder() int
 }
 
 func ConvertToNodeSlice[T Node](data []T) []Node {
@@ -29,6 +35,16 @@ func buildTree(nodeMap map[int64][]Node, parentId int64) []Node {
 	if !exists {
 		return []Node{}
 	}
+
+	// Sort children by order if they are sortable
+	sort.Slice(children, func(i, j int) bool {
+		a, aOk := children[i].(Sortable)
+		b, bOk := children[j].(Sortable)
+		if !aOk || !bOk {
+			return false
+		}
+		return a.GetOrder() < b.GetOrder()
+	})
 
 	tree := make([]Node, len(children))
 	for i, child := range children {

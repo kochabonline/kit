@@ -40,7 +40,6 @@ func TestLogw(t *testing.T) {
 	h.Debugw("key", "value")
 	err := errors.New(400, "test")
 	h.Errorw("error", err)
-	
 
 	s := NewHelper(slog.New().With().HelperCaller().Logger())
 	s.Debugw("test message", "key", "value")

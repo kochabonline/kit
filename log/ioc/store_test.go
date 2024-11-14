@@ -27,8 +27,8 @@ func (m *mock2) Name() string {
 }
 
 func TestStore(t *testing.T) {
-	Container.RegisterNamespace("test", 1)
-	Container.Register("test", &mock{})
+	Container.RegisterNamespace("test")
+	Container.Register("test", &mock{Data: "test"})
 	Container.Register(ConfigNamespace, &mock{})
 	Container.Register(DataBaseNamespace, &mock{})
 	Container.Register(DataBaseNamespace, &mock2{})
@@ -36,4 +36,5 @@ func TestStore(t *testing.T) {
 	Container.Register(ControllerNamespace, &mock{})
 	Container.RegisterWithPriority(ControllerNamespace, &mock2{}, -1)
 	Container.Init()
+	t.Log(Container.Get("test", "mock"))
 }
