@@ -4,9 +4,9 @@ import "sort"
 
 type Node interface {
 	GetNode() Node
+	SetChildren(children []Node)
 	GetId() int64
 	GetParentId() int64
-	SetChildren(children []Node)
 }
 
 type Sortable interface {
@@ -27,6 +27,19 @@ func buildNodeMap(nodes []Node) map[int64][]Node {
 		parentId := node.GetParentId()
 		nodeMap[parentId] = append(nodeMap[parentId], node)
 	}
+
+	// Sort children by order if they are sortable
+	for _, children := range nodeMap {
+		sort.Slice(children, func(i, j int) bool {
+			a, aOk := children[i].(Sortable)
+			b, bOk := children[j].(Sortable)
+			if !aOk || !bOk {
+				return false
+			}
+			return a.GetOrder() < b.GetOrder()
+		})
+	}
+
 	return nodeMap
 }
 
@@ -35,16 +48,6 @@ func buildTree(nodeMap map[int64][]Node, parentId int64) []Node {
 	if !exists {
 		return []Node{}
 	}
-
-	// Sort children by order if they are sortable
-	sort.Slice(children, func(i, j int) bool {
-		a, aOk := children[i].(Sortable)
-		b, bOk := children[j].(Sortable)
-		if !aOk || !bOk {
-			return false
-		}
-		return a.GetOrder() < b.GetOrder()
-	})
 
 	tree := make([]Node, len(children))
 	for i, child := range children {
