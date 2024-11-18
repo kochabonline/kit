@@ -19,7 +19,9 @@ var (
 	ErrUnsupportedKeySize         = errors.New("ecies: unsupported key size, must be one of 224, 256, 384, 521")
 	ErrInvalidDecode              = errors.New("ecies: invalid decode")
 	ErrInvalidPublicKey           = errors.New("ecies: invalid public key")
+	ErrInvalidCurve               = errors.New("ecies: invalid curve")
 	ErrSharedKeyIsPointAtInfinity = errors.New("ecies: shared key is point at infinity")
+	ErrSharedKeyTooShort          = errors.New("ecies: shared key too short")
 )
 
 // GenerateKey Generates a new ECDSA key pair and saves it to the specified directory
@@ -119,28 +121,46 @@ func LoadPublicKey(path string) (*ecdsa.PublicKey, error) {
 	return pub, nil
 }
 
-func Encrypt(pub *ecdsa.PublicKey, msg []byte) ([]byte, error) {
+func genSharedKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) ([]byte, error) {
+	if privateKey.Curve != publicKey.Curve {
+		return nil, ErrInvalidCurve
+	}
+
+	x, _ := publicKey.Curve.ScalarMult(publicKey.X, publicKey.Y, privateKey.D.Bytes())
+	if x == nil {
+		return nil, ErrSharedKeyIsPointAtInfinity
+	}
+	sharedKey := sha256.Sum256(x.Bytes())
+
+	return sharedKey[:], nil
+}
+
+func Encrypt(publicKey *ecdsa.PublicKey, msg []byte) ([]byte, error) {
+	// Generate temporary key pair
 	tempPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 	tempPub := &tempPriv.PublicKey
 
-	x, _ := pub.Curve.ScalarMult(pub.X, pub.Y, tempPriv.D.Bytes())
-	if x == nil {
-		return nil, ErrSharedKeyIsPointAtInfinity
+	// Generate shared key
+	sharedKey, err := genSharedKey(tempPriv, publicKey)
+	if err != nil {
+		return nil, err
 	}
-	sharedKey := sha256.Sum256(x.Bytes())
 
+	// Encrypt message
 	ciphertext := make([]byte, len(msg))
+	sharedKeyLen := len(sharedKey)
 	for i := range msg {
-		ciphertext[i] = msg[i] ^ sharedKey[i%len(sharedKey)]
+		ciphertext[i] = msg[i] ^ sharedKey[i%sharedKeyLen]
 	}
 
 	return append(append(tempPub.X.Bytes(), tempPub.Y.Bytes()...), ciphertext...), nil
 }
 
 func Decrypt(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
+	// Extract temporary public key
 	keyLen := (privateKey.Curve.Params().BitSize + 7) / 8
 	tempPubX := new(big.Int).SetBytes(data[:keyLen])
 	tempPubY := new(big.Int).SetBytes(data[keyLen : 2*keyLen])
@@ -150,15 +170,17 @@ func Decrypt(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
 		Y:     tempPubY,
 	}
 
-	x, _ := tempPub.Curve.ScalarMult(tempPub.X, tempPub.Y, privateKey.D.Bytes())
-	if x == nil {
-		return nil, ErrSharedKeyIsPointAtInfinity
+	// Generate shared key
+	sharedKey, err := genSharedKey(privateKey, tempPub)
+	if err != nil {
+		return nil, err
 	}
-	sharedKey := sha256.Sum256(x.Bytes())
 
+	// Decrypt message
 	msg := data[2*keyLen:]
+	sharedKeyLen := len(sharedKey)
 	for i := range msg {
-		msg[i] = msg[i] ^ sharedKey[i%len(sharedKey)]
+		msg[i] = msg[i] ^ sharedKey[i%sharedKeyLen]
 	}
 
 	return msg, nil

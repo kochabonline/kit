@@ -1,6 +1,9 @@
 package ecies
 
-import "testing"
+import (
+	"encoding/hex"
+	"testing"
+)
 
 func TestEcies(t *testing.T) {
 	if err := GenerateKey(); err != nil {
@@ -15,7 +18,8 @@ func TestEcies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("ciphertext:", ciphertext)
+	encodedCiphertext := hex.EncodeToString(ciphertext)
+	t.Log("ciphertext:", encodedCiphertext)
 
 	plaintext, err := Decrypt(privateKey, ciphertext)
 	if err != nil {
