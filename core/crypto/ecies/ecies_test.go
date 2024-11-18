@@ -3,9 +3,9 @@ package ecies
 import "testing"
 
 func TestEcies(t *testing.T) {
-	// if err := GenerateKey(); err != nil {
-	// 	t.Fatal(err)
-	// }
+	if err := GenerateKey(); err != nil {
+		t.Fatal(err)
+	}
 	privateKey, err := LoadPrivateKey("private.pem")
 	if err != nil {
 		t.Fatal(err)

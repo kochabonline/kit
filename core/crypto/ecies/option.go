@@ -1,7 +1,6 @@
 package ecies
 
 type KeyOption struct {
-	Size               int    `json:"size" default:"256"`
 	Dirpath            string `json:"dirpath" default:"."`
 	PrivateKeyFilename string `json:"private.pem" default:"private.pem"`
 	PublicKeyFilename  string `json:"public.pem" default:"public.pem"`

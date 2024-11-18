@@ -16,20 +16,11 @@ import (
 )
 
 var (
-	ErrUnsupportedKeySize = errors.New("ecies: unsupported key size, must be one of 224, 256, 384, 521")
-	ErrInvalidDecode      = errors.New("ecies: invalid decode")
-	ErrInvalidPublicKey   = errors.New("ecies: invalid public key")
+	ErrUnsupportedKeySize         = errors.New("ecies: unsupported key size, must be one of 224, 256, 384, 521")
+	ErrInvalidDecode              = errors.New("ecies: invalid decode")
+	ErrInvalidPublicKey           = errors.New("ecies: invalid public key")
+	ErrSharedKeyIsPointAtInfinity = errors.New("ecies: shared key is point at infinity")
 )
-
-type PrivateKey struct {
-	PublicKey
-	D *big.Int
-}
-
-type PublicKey struct {
-	X, Y *big.Int
-	elliptic.Curve
-}
 
 // GenerateKey Generates a new ECDSA key pair and saves it to the specified directory
 func GenerateKey(opts ...func(*KeyOption)) error {
@@ -43,21 +34,7 @@ func GenerateKey(opts ...func(*KeyOption)) error {
 		opt(option)
 	}
 
-	var privateKey *ecdsa.PrivateKey
-	var err error
-
-	switch option.Size {
-	case 224:
-		privateKey, err = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
-	case 256:
-		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	case 384:
-		privateKey, err = ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	case 521:
-		privateKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-	default:
-		return ErrUnsupportedKeySize
-	}
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
 	}
@@ -150,6 +127,9 @@ func Encrypt(pub *ecdsa.PublicKey, msg []byte) ([]byte, error) {
 	tempPub := &tempPriv.PublicKey
 
 	x, _ := pub.Curve.ScalarMult(pub.X, pub.Y, tempPriv.D.Bytes())
+	if x == nil {
+		return nil, ErrSharedKeyIsPointAtInfinity
+	}
 	sharedKey := sha256.Sum256(x.Bytes())
 
 	ciphertext := make([]byte, len(msg))
@@ -171,6 +151,9 @@ func Decrypt(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
 	}
 
 	x, _ := tempPub.Curve.ScalarMult(tempPub.X, tempPub.Y, privateKey.D.Bytes())
+	if x == nil {
+		return nil, ErrSharedKeyIsPointAtInfinity
+	}
 	sharedKey := sha256.Sum256(x.Bytes())
 
 	msg := data[2*keyLen:]
