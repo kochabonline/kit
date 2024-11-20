@@ -1,6 +1,9 @@
 package ecies
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -8,21 +11,59 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"io"
 	"math/big"
+
 	"os"
 	"path/filepath"
 
 	"github.com/kochabonline/kit/core/reflect"
+	"golang.org/x/crypto/hkdf"
 )
 
 var (
-	ErrUnsupportedKeySize         = errors.New("ecies: unsupported key size, must be one of 224, 256, 384, 521")
-	ErrInvalidDecode              = errors.New("ecies: invalid decode")
-	ErrInvalidPublicKey           = errors.New("ecies: invalid public key")
-	ErrInvalidCurve               = errors.New("ecies: invalid curve")
-	ErrSharedKeyIsPointAtInfinity = errors.New("ecies: shared key is point at infinity")
-	ErrSharedKeyTooShort          = errors.New("ecies: shared key too short")
+	ErrInvalidDecode     = errors.New("ecies: invalid decode")
+	ErrInvalidPublicKey  = errors.New("ecies: invalid public key")
+	ErrPrivateKeyEmpty   = errors.New("ecies: private key is empty")
+	ErrPublicKeyEmpty    = errors.New("ecies: public key is empty")
+	ErrInvalidDataLength = errors.New("ecies: invalid data length")
 )
+
+func kdf(secret []byte) (key []byte, err error) {
+	key = make([]byte, 32)
+	kdf := hkdf.New(sha256.New, secret, nil, nil)
+	if _, err := io.ReadFull(kdf, key); err != nil {
+		return nil, fmt.Errorf("ecies: failed to derive key: %w", err)
+	}
+
+	return key, nil
+}
+
+func zeroPad(b []byte, length int) []byte {
+	if len(b) > length {
+		return b[:length]
+	}
+	if len(b) < length {
+		b = append(make([]byte, length-len(b)), b...)
+	}
+	return b
+}
+
+// PublicKey represents an ECDSA public key
+func ImportECDSAPublic(publicKey *ecdsa.PublicKey) *PublicKey {
+	return &PublicKey{
+		Curve: publicKey.Curve,
+		X:     publicKey.X,
+		Y:     publicKey.Y,
+	}
+}
+
+// PrivateKey represents an ECDSA private key
+func ImportECDSA(privateKey *ecdsa.PrivateKey) *PrivateKey {
+	pub := ImportECDSAPublic(&privateKey.PublicKey)
+	return &PrivateKey{PublicKey: pub, D: privateKey.D}
+}
 
 // GenerateKey Generates a new ECDSA key pair and saves it to the specified directory
 func GenerateKey(opts ...func(*KeyOption)) error {
@@ -77,7 +118,7 @@ func GenerateKey(opts ...func(*KeyOption)) error {
 }
 
 // LoadPrivateKey loads an ECDSA private key from the specified file
-func LoadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
+func LoadPrivateKey(path string) (*PrivateKey, error) {
 	privateKeyBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -93,11 +134,11 @@ func LoadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	return privateKey, nil
+	return ImportECDSA(privateKey), nil
 }
 
 // LoadPublicKey loads an ECDSA public key from the specified file
-func LoadPublicKey(path string) (*ecdsa.PublicKey, error) {
+func LoadPublicKey(path string) (*PublicKey, error) {
 	publicKeyBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -118,70 +159,96 @@ func LoadPublicKey(path string) (*ecdsa.PublicKey, error) {
 		return nil, ErrInvalidPublicKey
 	}
 
-	return pub, nil
+	return ImportECDSAPublic(pub), nil
 }
 
-func genSharedKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if privateKey.Curve != publicKey.Curve {
-		return nil, ErrInvalidCurve
-	}
+func Encrypt(pub *PublicKey, data []byte) ([]byte, error) {
+	var ct bytes.Buffer
 
-	x, _ := publicKey.Curve.ScalarMult(publicKey.X, publicKey.Y, privateKey.D.Bytes())
-	if x == nil {
-		return nil, ErrSharedKeyIsPointAtInfinity
-	}
-	sharedKey := sha256.Sum256(x.Bytes())
-
-	return sharedKey[:], nil
-}
-
-func Encrypt(publicKey *ecdsa.PublicKey, msg []byte) ([]byte, error) {
-	// Generate temporary key pair
-	tempPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// ephemeral key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
-	tempPub := &tempPriv.PublicKey
+	ek := ImportECDSA(privateKey)
 
-	// Generate shared key
-	sharedKey, err := genSharedKey(tempPriv, publicKey)
+	ct.Write(ek.PublicKey.Bytes(false))
+
+	// derive shared secret
+	ss, err := ek.Encapsulate(pub)
 	if err != nil {
 		return nil, err
 	}
 
-	// Encrypt message
-	ciphertext := make([]byte, len(msg))
-	sharedKeyLen := len(sharedKey)
-	for i := range msg {
-		ciphertext[i] = msg[i] ^ sharedKey[i%sharedKeyLen]
+	// aes encryption
+	block, err := aes.NewCipher(ss)
+	if err != nil {
+		return nil, fmt.Errorf("ecies: cannot create aes block: %w", err)
 	}
 
-	return append(append(tempPub.X.Bytes(), tempPub.Y.Bytes()...), ciphertext...), nil
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("ecies: cannot read random bytes for nonce: %w", err)
+	}
+	ct.Write(nonce)
+
+	aesgcm, err := cipher.NewGCMWithNonceSize(block, 16)
+	if err != nil {
+		return nil, fmt.Errorf("ecies: cannot create aes gcm: %w", err)
+	}
+
+	ciphertext := aesgcm.Seal(nil, nonce, data, nil)
+
+	tag := ciphertext[len(ciphertext)-aesgcm.NonceSize():]
+	ct.Write(tag)
+	ciphertext = ciphertext[:len(ciphertext)-len(tag)]
+	ct.Write(ciphertext)
+
+	return ct.Bytes(), nil
 }
 
-func Decrypt(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
-	// Extract temporary public key
-	keyLen := (privateKey.Curve.Params().BitSize + 7) / 8
-	tempPubX := new(big.Int).SetBytes(data[:keyLen])
-	tempPubY := new(big.Int).SetBytes(data[keyLen : 2*keyLen])
-	tempPub := &ecdsa.PublicKey{
-		Curve: privateKey.Curve,
-		X:     tempPubX,
-		Y:     tempPubY,
+func Decrypt(priv *PrivateKey, data []byte) ([]byte, error) {
+	if len(data) <= (1 + 32 + 32 + 16 + 16) {
+		return nil, ErrInvalidDataLength
 	}
 
-	// Generate shared key
-	sharedKey, err := genSharedKey(privateKey, tempPub)
+	// ephemeral sender public key
+	ethPub := &PublicKey{
+		Curve: elliptic.P256(),
+		X:     new(big.Int).SetBytes(data[1 : 1+32]),
+		Y:     new(big.Int).SetBytes(data[1+32 : 1+32+32]),
+	}
+
+	// shift data
+	data = data[65:]
+
+	// derive shared secret
+	ss, err := ethPub.Decapsulate(priv)
 	if err != nil {
 		return nil, err
 	}
 
-	// Decrypt message
-	msg := data[2*keyLen:]
-	sharedKeyLen := len(sharedKey)
-	for i := range msg {
-		msg[i] = msg[i] ^ sharedKey[i%sharedKeyLen]
+	// aes decryption part
+	nonce := data[:16]
+	tag := data[16:32]
+
+	// ciphertext
+	ciphertext := bytes.Join([][]byte{data[32:], tag}, nil)
+
+	block, err := aes.NewCipher(ss)
+	if err != nil {
+		return nil, fmt.Errorf("ecies: cannot create new aes block: %w", err)
 	}
 
-	return msg, nil
+	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
+	if err != nil {
+		return nil, fmt.Errorf("ecies: cannot create gcm cipher: %w", err)
+	}
+
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("ecies: cannot decrypt ciphertext: %w", err)
+	}
+
+	return plaintext, nil
 }
