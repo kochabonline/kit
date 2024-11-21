@@ -1,8 +1,12 @@
 package validator
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 )
@@ -42,6 +46,29 @@ func TestStruct(t *testing.T) {
 	}
 	err := Struct(m)
 	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(m)
+}
+
+func TestBind(t *testing.T) {
+	var m mock
+
+	// mock request
+	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer([]byte(`{"name":"hello!","age":17}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	// req.Header.Set("Language", "en")
+
+	// mock context
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+
+	// bind
+	if err = GinShouldBindJSON(c, &m); err != nil {
 		t.Fatal(err)
 	}
 	t.Log(m)
