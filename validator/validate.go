@@ -87,12 +87,11 @@ func StructTrans(target any, language string) error {
 		}
 
 		var trans ut.Translator
-		switch language {
-		case "en":
-			trans = TransEn
-		case "zh":
+		if strings.HasPrefix(language, "zh") {
 			trans = TransZh
-		default:
+		} else if strings.HasPrefix(language, "en") {
+			trans = TransEn
+		} else {
 			trans = TransEn
 		}
 

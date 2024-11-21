@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kochabonline/kit/errors"
 )
 
 var languageHeader atomic.Value
@@ -26,8 +27,11 @@ func bindValidate(c *gin.Context, obj any, bindFunc func(any) error) error {
 	}
 
 	language := c.GetHeader(getLanguageHeader())
+	if err := StructTrans(obj, language); err != nil {
+		return errors.BadRequest(err.Error())
+	}
 
-	return StructTrans(obj, language)
+	return nil
 }
 
 func GinShouldBindQuery(c *gin.Context, obj any) error {
