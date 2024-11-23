@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/kochabonline/kit/core/reflect"
-	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
 )
 
@@ -54,14 +53,14 @@ func NewConfig(option Option, opts ...ConfigOption) *Config {
 	}
 
 	if err := c.init(); err != nil {
-		c.log.Fatalf("failed to initialize config: %v", err)
+		c.log.Fatalf("config: %v", err)
 	}
 
 	for _, opt := range opts {
 		opt(c)
 	}
 
-	c.viper()
+	c.setDefault()
 
 	return c
 }
@@ -70,7 +69,7 @@ func (c *Config) init() error {
 	return reflect.SetDefaultTag(c.Option.Target)
 }
 
-func (c *Config) viper() {
+func (c *Config) setDefault() {
 	if c.Option.Path == "" {
 		c.Option.Path = "."
 	}
@@ -85,28 +84,31 @@ func (c *Config) viper() {
 	viper.SetEnvKeyReplacer(replacer)
 }
 
-func (c *Config) Read() error {
+func (c *Config) GetViper() *viper.Viper {
+	return viper.GetViper()
+}
+
+func (c *Config) ReadInConfig() error {
 	if err := viper.ReadInConfig(); err != nil {
-		return errors.Internal("failed to read config file: %v", err)
+		return err
 	}
 
 	if err := viper.Unmarshal(&c.Option.Target); err != nil {
-		return errors.Internal("failed to unmarshal config: %v", err)
+		return err
 	}
 
 	return nil
 }
 
-func (c *Config) Watch() error {
+func (c *Config) WatchConfig() error {
 	ch := make(chan error, 1)
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		c.log.Infof("config file changed: %s", e.Name)
-		if err := c.Read(); err != nil {
+		if err := c.ReadInConfig(); err != nil {
 			ch <- err
 		}
 	})
-
 	viper.WatchConfig()
 
 	select {

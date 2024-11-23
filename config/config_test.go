@@ -5,7 +5,7 @@ import (
 )
 
 type mock struct {
-	Host    string  `json:"host" default:"localhost"`
+	Host    string  `json:"host"`
 	Port    int     `json:"port" default:"8080"`
 	Number  float64 `json:"number"`
 	Enabled bool    `json:"enabled"`
@@ -17,16 +17,15 @@ type mock struct {
 func TestConfig(t *testing.T) {
 	cfg := new(mock)
 	c := NewConfig(Option{
-		Provider: ProviderFile,
-		Target:   cfg,
+		Target: cfg,
 	})
 
-	if err := c.Read(); err != nil {
-		t.Error(err)
+	if err := c.ReadInConfig(); err != nil {
+		t.Fatal(err)
 	}
-
-	if err := c.Watch(); err != nil {
-		t.Error(err)
+	t.Log(cfg)
+	if err := c.WatchConfig(); err != nil {
+		t.Fatal(err)
 	}
 
 	t.Log(cfg)
