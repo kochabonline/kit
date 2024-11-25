@@ -7,7 +7,7 @@ type Policy struct {
 }
 
 type ApiPolicies struct {
-	Policies []Policy `json:"rules" validate:"required,dive"`
+	Policies []Policy `json:"policies" validate:"required,dive"`
 }
 
 func convert(policies []Policy) [][]string {

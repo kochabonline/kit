@@ -17,11 +17,6 @@ const (
 	ProviderFile Provider = iota
 )
 
-type Interface interface {
-	Read() error
-	Watch() error
-}
-
 type Config struct {
 	Option Option `json:"option"`
 	log    *log.Helper

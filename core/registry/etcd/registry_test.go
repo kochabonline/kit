@@ -11,7 +11,9 @@ import (
 )
 
 func TestRegistry(t *testing.T) {
-	e, err := etcd.New(&etcd.Config{})
+	e, err := etcd.New(&etcd.Config{
+		Password: "12345678",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,5 +37,5 @@ func TestRegistry(t *testing.T) {
 	r.Register(context.Background(), instance)
 	time.Sleep(3 * time.Second)
 	_ = r.Deregister(context.Background(), instance)
-	time.Sleep(30 * time.Second)
+	time.Sleep(10 * time.Second)
 }
