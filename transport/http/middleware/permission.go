@@ -19,9 +19,8 @@ const (
 
 type PermissionHPEConfig struct {
 	// Param is the param key to look for the id value
-	Param string
-	// SkippedRoles is a list of roles that should be skipped from permission
-	SkippedRoles []string
+	Param       string
+	SkippedRole int
 }
 
 func PermissionHPE() gin.HandlerFunc {
@@ -47,7 +46,7 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 			return
 		}
 
-		if findRoleWithEmpty(userRole, config.SkippedRoles...) {
+		if config.SkippedRole <= userRole {
 			c.Next()
 			return
 		}
@@ -63,13 +62,12 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 }
 
 type PermissionVPEConfig struct {
-	// AllowRole is the role level that should be allowed to access
-	AllowedRoles []string
+	AllowedRole int
 }
 
-func PermissionAllow(roles ...string) gin.HandlerFunc {
+func PermissionAllow(role int) gin.HandlerFunc {
 	return PermissionVPEWithConfig(PermissionVPEConfig{
-		AllowedRoles: roles,
+		AllowedRole: role,
 	})
 }
 
@@ -82,8 +80,8 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 			return
 		}
 
-		if !findRoleWithEmpty(userRole, config.AllowedRoles...) {
-			log.Errorw("userId", userId, "userRole", userRole, "error", errors.Forbidden("%s is not allowed to access", userRole))
+		if config.AllowedRole >= userRole {
+			log.Errorw("userId", userId, "userRole", userRole, "error", errors.Forbidden("%d is not allowed to access", userRole))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}

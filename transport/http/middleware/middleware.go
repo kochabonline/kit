@@ -20,27 +20,13 @@ func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {
 	return false
 }
 
-func findRoleWithEmpty(userRole string, roles ...string) bool {
-	if len(roles) == 0 {
-		return true
-	}
-
-	for _, role := range roles {
-		if userRole == role {
-			return true
-		}
-	}
-
-	return false
-}
-
-func userInfo(c *gin.Context) (userId int64, userRole string, err error) {
+func userInfo(c *gin.Context) (userId int64, userRole int, err error) {
 	ctx := c.Request.Context()
 	userId, err = tools.CtxValue[int64](ctx, "userId")
 	if err != nil {
 		return
 	}
-	userRole, err = tools.CtxValue[string](ctx, "userRole")
+	userRole, err = tools.CtxValue[int](ctx, "userRole")
 	if err != nil {
 		return
 	}
