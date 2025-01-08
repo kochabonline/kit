@@ -11,7 +11,7 @@ import (
 func TestCasbin(t *testing.T) {
 	m, err := mysql.New(&mysql.Config{
 		Password: "12345678",
-		DataBase: "test",
+		Database: "test",
 	})
 	if err != nil {
 		t.Fatal(err)

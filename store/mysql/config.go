@@ -12,7 +12,7 @@ type Config struct {
 	Port            int    `json:"port" default:"3306"`
 	User            string `json:"user" default:"root"`
 	Password        string `json:"password"`
-	DataBase        string `json:"database"`
+	Database        string `json:"database"`
 	Charset         string `json:"charset" default:"utf8mb4"`
 	ParseTime       bool   `json:"parseTime" default:"true"`
 	Loc             string `json:"loc" default:"Local"`
@@ -38,7 +38,7 @@ func (c *Config) dsn() string {
 	builder.WriteString(":")
 	builder.WriteString(strconv.Itoa(c.Port))
 	builder.WriteString(")/")
-	builder.WriteString(c.DataBase)
+	builder.WriteString(c.Database)
 	builder.WriteString("?charset=")
 	builder.WriteString(c.Charset)
 	builder.WriteString("&loc=")
