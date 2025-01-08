@@ -1,4 +1,4 @@
-package gopt
+package gotp
 
 import (
 	"bytes"
