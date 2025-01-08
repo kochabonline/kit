@@ -20,13 +20,13 @@ func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {
 	return false
 }
 
-func userInfo(c *gin.Context) (userId int64, userRole int, err error) {
+func ctxAccountInfo(c *gin.Context) (id int64, role int, err error) {
 	ctx := c.Request.Context()
-	userId, err = tools.CtxValue[int64](ctx, "userId")
+	id, err = tools.CtxValue[int64](ctx, "id")
 	if err != nil {
 		return
 	}
-	userRole, err = tools.CtxValue[int](ctx, "userRole")
+	role, err = tools.CtxValue[int](ctx, "role")
 	if err != nil {
 		return
 	}

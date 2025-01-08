@@ -28,21 +28,21 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 
 		obj := c.Request.RequestURI
 		act := c.Request.Method
-		userId, sub, err := userInfo(c)
+		accountId, sub, err := ctxAccountInfo(c)
 		if err != nil {
-			log.Errorw("userId", userId, "role", sub, "path", obj, "method", act, "error", err.Error())
+			log.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", err.Error())
 			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden))
 			return
 		}
 
 		ok, err := config.E.Enforce(sub, obj, act)
 		if err != nil {
-			log.Errorw("userId", userId, "role", sub, "path", obj, "method", act, "error", err.Error())
+			log.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", err.Error())
 			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden))
 			return
 		}
 		if !ok {
-			log.Errorw("userId", userId, "role", sub, "path", obj, "method", act, "error", "casbin denied access")
+			log.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", "casbin denied access")
 			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden))
 			return
 		}

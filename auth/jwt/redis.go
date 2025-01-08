@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrInvalidUserId = errors.New("invalid user id")
+	ErrInvalidId = errors.New("invalid id")
 )
 
 type Auth struct {
@@ -84,44 +84,44 @@ func NewJwtRedis(jwt *Jwt, client *redis.Client, opts ...JwtRedisOption) *JwtRed
 	return jwtRedis
 }
 
-func (r *JwtRedis) key(userId int64, key string) string {
+func (r *JwtRedis) key(id int64, key string) string {
 	var builder strings.Builder
 	builder.WriteString(r.prefix)
 	builder.WriteString(":")
-	builder.WriteString(strconv.FormatInt(userId, 10))
+	builder.WriteString(strconv.FormatInt(id, 10))
 	builder.WriteString(":")
 	builder.WriteString(key)
 	return builder.String()
 }
 
-func (r *JwtRedis) getUserId(claims jwt.MapClaims) (int64, error) {
-	userId, ok := claims["userId"]
+func (r *JwtRedis) getIdByClaims(claims jwt.MapClaims) (int64, error) {
+	id, ok := claims["id"]
 	if !ok {
-		return 0, ErrInvalidUserId
+		return 0, ErrInvalidId
 	}
 
-	switch v := userId.(type) {
+	switch v := id.(type) {
 	case int64:
 		return v, nil
 	case float64:
 		return int64(v), nil
 	case string:
-		id, err := strconv.ParseInt(v, 10, 64)
+		parsed, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			return 0, err
 		}
-		return id, nil
+		return parsed, nil
 	default:
-		return 0, ErrInvalidUserId
+		return 0, ErrInvalidId
 	}
 }
 
 // exists checks if jti exists in redis, used to determine if the token is valid
-func (r *JwtRedis) exists(ctx context.Context, userId int64, jtis ...string) bool {
+func (r *JwtRedis) exists(ctx context.Context, id int64, jtis ...string) bool {
 	if r.multipleLogin {
 		keys := make([]string, len(jtis))
 		for i, jti := range jtis {
-			keys[i] = r.key(userId, jti)
+			keys[i] = r.key(id, jti)
 		}
 
 		result, err := r.client.Exists(ctx, keys...).Result()
@@ -132,8 +132,8 @@ func (r *JwtRedis) exists(ctx context.Context, userId int64, jtis ...string) boo
 		return result == int64(len(jtis))
 	} else {
 		keys := []string{
-			r.key(userId, r.accessPrefix),
-			r.key(userId, r.refreshPrefix),
+			r.key(id, r.accessPrefix),
+			r.key(id, r.refreshPrefix),
 		}
 		result, err := r.client.MGet(ctx, keys...).Result()
 		if err != nil {
@@ -158,7 +158,7 @@ func (r *JwtRedis) exists(ctx context.Context, userId int64, jtis ...string) boo
 }
 
 func (r *JwtRedis) Generate(ctx context.Context, claims jwt.MapClaims) (*Auth, error) {
-	userId, err := r.getUserId(claims)
+	id, err := r.getIdByClaims(claims)
 	if err != nil {
 		return nil, err
 	}
@@ -177,11 +177,11 @@ func (r *JwtRedis) Generate(ctx context.Context, claims jwt.MapClaims) (*Auth, e
 
 	_, err = r.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		if r.multipleLogin {
-			pipe.Set(ctx, r.key(userId, aJti), "", r.expire)
-			pipe.Set(ctx, r.key(userId, rJti), "", r.refreshExpire)
+			pipe.Set(ctx, r.key(id, aJti), "", r.expire)
+			pipe.Set(ctx, r.key(id, rJti), "", r.refreshExpire)
 		} else {
-			pipe.Set(ctx, r.key(userId, r.accessPrefix), aJti, r.expire)
-			pipe.Set(ctx, r.key(userId, r.refreshPrefix), rJti, r.refreshExpire)
+			pipe.Set(ctx, r.key(id, r.accessPrefix), aJti, r.expire)
+			pipe.Set(ctx, r.key(id, r.refreshPrefix), rJti, r.refreshExpire)
 		}
 		return nil
 	})
@@ -201,7 +201,7 @@ func (r *JwtRedis) Refresh(ctx context.Context, token string) (string, error) {
 		return "", err
 	}
 
-	userId, err := r.getUserId(claims)
+	id, err := r.getIdByClaims(claims)
 	if err != nil {
 		return "", err
 	}
@@ -212,7 +212,7 @@ func (r *JwtRedis) Refresh(ctx context.Context, token string) (string, error) {
 	}
 
 	// jti does not exist in redis, indicating that the refresh token has expired
-	if exists := r.exists(ctx, userId, jti); !exists {
+	if exists := r.exists(ctx, id, jti); !exists {
 		return "", jwt.ErrTokenExpired
 	}
 
@@ -223,10 +223,10 @@ func (r *JwtRedis) Refresh(ctx context.Context, token string) (string, error) {
 	}
 
 	if r.multipleLogin {
-		return newToken, r.client.Set(ctx, r.key(userId, newJti), "", r.expire).Err()
+		return newToken, r.client.Set(ctx, r.key(id, newJti), "", r.expire).Err()
 	}
 
-	return newToken, r.client.Set(ctx, r.key(userId, r.accessPrefix), newJti, r.expire).Err()
+	return newToken, r.client.Set(ctx, r.key(id, r.accessPrefix), newJti, r.expire).Err()
 }
 
 func (r *JwtRedis) Parse(ctx context.Context, tokens ...string) (jwt.MapClaims, error) {
@@ -251,25 +251,25 @@ func (r *JwtRedis) Parse(ctx context.Context, tokens ...string) (jwt.MapClaims, 
 	// The fields in the token are the same except for jti and exp, so you can take the first claims
 	claims := claimsSlice[0]
 
-	userId, err := r.getUserId(claimsSlice[0])
+	id, err := r.getIdByClaims(claimsSlice[0])
 	if err != nil {
 		return nil, err
 	}
 
-	if exists := r.exists(ctx, userId, jtis...); !exists {
+	if exists := r.exists(ctx, id, jtis...); !exists {
 		return nil, jwt.ErrTokenExpired
 	}
 
 	return claims, nil
 }
 
-func (r *JwtRedis) Delete(ctx context.Context, userId int64) error {
+func (r *JwtRedis) Delete(ctx context.Context, id int64) error {
 	var cursor uint64
 	var keys []string
 	var err error
 	for {
 		var scanKeys []string
-		scanKeys, cursor, err = r.client.Scan(ctx, cursor, r.key(userId, "*"), 10).Result()
+		scanKeys, cursor, err = r.client.Scan(ctx, cursor, r.key(id, "*"), 10).Result()
 		if err != nil {
 			return err
 		}

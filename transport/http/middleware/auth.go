@@ -11,7 +11,7 @@ type AuthConfig struct {
 	// SkippedPathPrefixes is a list of path prefixes that should be skipped from auth
 	SkippedPathPrefixes []string
 	// Validate is a function that takes a gin context and returns the auth value
-	// The fields that must be included are: userId, userRole
+	// The fields that must be included are: id, role
 	// struct{} or a type that implements the String() method
 	Validate func(c *gin.Context) (map[any]any, error)
 }

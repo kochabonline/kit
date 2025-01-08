@@ -39,20 +39,20 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 			return
 		}
 
-		userId, userRole, err := userInfo(c)
+		accountId, accountRole, err := ctxAccountInfo(c)
 		if err != nil {
 			log.Errorw("error", err.Error())
 			response.GinJSONError(c, err)
 			return
 		}
 
-		if config.SkippedRole <= userRole {
+		if config.SkippedRole <= accountRole {
 			c.Next()
 			return
 		}
 
-		if paramValue != strconv.FormatInt(userId, 10) {
-			log.Errorw("userId", userId, "error", errors.Forbidden("%d is not allowed to access %s", userId, paramValue))
+		if paramValue != strconv.FormatInt(accountId, 10) {
+			log.Errorw("accountId", accountId, "error", errors.Forbidden("%d is not allowed to access %s", accountId, paramValue))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
@@ -73,15 +73,15 @@ func PermissionAllow(role int) gin.HandlerFunc {
 
 func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userId, userRole, err := userInfo(c)
+		accountId, accountRole, err := ctxAccountInfo(c)
 		if err != nil {
 			log.Errorw("error", err.Error())
 			response.GinJSONError(c, err)
 			return
 		}
 
-		if config.AllowedRole >= userRole {
-			log.Errorw("userId", userId, "userRole", userRole, "error", errors.Forbidden("%d is not allowed to access", userRole))
+		if config.AllowedRole >= accountRole {
+			log.Errorw("accountId", accountId, "accountRole", accountRole, "error", errors.Forbidden("%d is not allowed to access", accountRole))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}

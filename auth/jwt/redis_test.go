@@ -8,7 +8,7 @@ import (
 	"github.com/kochabonline/kit/store/redis"
 )
 
-type User struct {
+type Account struct {
 	Id       int64  `json:"id"`
 	Username string `json:"username"`
 }
@@ -31,13 +31,13 @@ func TestSingle(t *testing.T) {
 
 	jwtRedis := NewJwtRedis(jwt, r.Client, WithMultipleLogin(true))
 
-	User := &User{
+	account := &Account{
 		Id:       123,
 		Username: "test",
 	}
 	claims := map[string]any{
-		"username": User.Username,
-		"userId":   User.Id,
+		"username": account.Username,
+		"id":   account.Id,
 	}
 
 	ctx := context.Background()
@@ -65,5 +65,5 @@ func TestSingle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// jwtRedis.Delete(ctx, User.Id)
+	// jwtRedis.Delete(ctx, account.Id)
 }
