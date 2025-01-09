@@ -8,22 +8,20 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kochabonline/kit/core/tools"
 )
 
+// otpauth://totp/{label}?secret={secret}&issuer={issuer}&algorithm={algorithm}&digits={digits}&period={period}
 type GoogleAuthenticatorer interface {
 	GenerateSecret() string
 	GenerateCode(secret string) (string, error)
-	GenerateQRCode(label string, issuer string, secret string) string
-	GenerateQRUrl(label string, issuer string, secret string) string
+	GenerateQRCode(label string, issuer string, secret string) (string, error)
 	ValidateCode(secret, code string) (bool, error)
 }
-
-const (
-	// qrapi is the default QR code API
-	qrapi = "https://api.qrserver.com/v1/create-qr-code/?data="
-)
 
 var (
 	GA GoogleAuthenticatorer
@@ -34,10 +32,10 @@ func init() {
 }
 
 type GoogleAuthenticator struct {
-	SecretSize   int    `json:"secret_size"`
-	ExpireSecond int    `json:"expire_second"`
-	Digits       int    `json:"digits"`
-	QrApi        string `json:"qr_api"`
+	SecretSize   int `json:"secret_size"`
+	ExpireSecond int `json:"expire_second"`
+	Digits       int `json:"digits"`
+	QrCodeSize   int `json:"qr_code_size"`
 }
 
 type Option func(*GoogleAuthenticator)
@@ -60,9 +58,9 @@ func WithDigits(digits int) Option {
 	}
 }
 
-func WithQrApi(qrApi string) Option {
+func WithQrCodeSize(qrCodeSize int) Option {
 	return func(ga *GoogleAuthenticator) {
-		ga.QrApi = qrApi
+		ga.QrCodeSize = qrCodeSize
 	}
 }
 
@@ -72,7 +70,7 @@ func NewGoogleAuthenticator(Opt ...Option) GoogleAuthenticatorer {
 		SecretSize:   16,
 		ExpireSecond: 30,
 		Digits:       6,
-		QrApi:        qrapi,
+		QrCodeSize:   256,
 	}
 
 	for _, opt := range Opt {
@@ -120,35 +118,24 @@ func (ga *GoogleAuthenticator) GenerateCode(secret string) (string, error) {
 }
 
 // GenerateQRCode generates a new QR code
-func (ga *GoogleAuthenticator) GenerateQRCode(label string, issuer string, secret string) string {
+func (ga *GoogleAuthenticator) generateQRData(label string, issuer string, secret string) string {
 	var builder strings.Builder
 	builder.WriteString("otpauth://totp/")
 	builder.WriteString(label)
-	builder.WriteString(":")
-	builder.WriteString(issuer)
 	builder.WriteString("?secret=")
 	builder.WriteString(secret)
 	builder.WriteString("&issuer=")
 	builder.WriteString(issuer)
+	timestamp := time.Now().Unix()
+	builder.WriteString("&timestamp=")
+	builder.WriteString(strconv.FormatInt(timestamp, 10))
 
 	return builder.String()
 }
 
 // GenerateQRrl generates a new QR code
-func (ga *GoogleAuthenticator) GenerateQRUrl(label string, issuer string, secret string) string {
-	var builder strings.Builder
-
-	builder.WriteString(ga.QrApi)
-	builder.WriteString("otpauth://totp/")
-	builder.WriteString(label)
-	builder.WriteString(":")
-	builder.WriteString(issuer)
-	builder.WriteString("?secret=")
-	builder.WriteString(secret)
-	builder.WriteString("&issuer=")
-	builder.WriteString(issuer)
-
-	return builder.String()
+func (ga *GoogleAuthenticator) GenerateQRCode(label string, issuer string, secret string) (string, error) {
+	return tools.QRCode(ga.generateQRData(label, issuer, secret), ga.QrCodeSize)
 }
 
 // ValidateCode validates a code
