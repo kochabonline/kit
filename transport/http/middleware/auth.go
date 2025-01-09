@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/transport/http/response"
@@ -37,12 +36,6 @@ func AuthWithConfig(config AuthConfig) gin.HandlerFunc {
 			ctx = context.WithValue(ctx, k, v)
 		}
 		c.Request = c.Request.WithContext(ctx)
-
-		// 测试
-        for k, v := range result {
-            log.Printf("key: %v, value: %v", k, v)
-        }
-		log.Printf("context: %v", c.Request.Context().Value("id"))
 
 		c.Next()
 	}
