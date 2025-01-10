@@ -4,10 +4,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kochabonline/kit/errors"
 )
 
 type Option struct {
@@ -46,7 +47,7 @@ func Verify(secret, signature string, timestamp int64, opts ...func(*Option)) er
 	}
 
 	if time.Now().Unix()-timestamp > 60*5 {
-		return errors.New("timestamp expired")
+		return errors.BadRequest("timestamp expired")
 	}
 	var toSign strings.Builder
 	toSign.WriteString(strconv.FormatInt(timestamp, 10))
@@ -58,7 +59,7 @@ func Verify(secret, signature string, timestamp int64, opts ...func(*Option)) er
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(toSign.String()))
 	if hex.EncodeToString(h.Sum(nil)) != signature {
-		return errors.New("signature mismatch")
+		return errors.BadRequest("signature mismatch")
 	}
 
 	return nil

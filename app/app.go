@@ -109,7 +109,7 @@ func (a *App) Run() error {
 	eg.Go(func() error {
 		select {
 		case signal := <-ch:
-			a.log.Infof("Received signal %s, shutting down", signal)
+			a.log.Infof("received signal %s, shutting down", signal)
 
 			// Wait for all clean functions to finish
 			cwg := sync.WaitGroup{}
