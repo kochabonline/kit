@@ -34,6 +34,14 @@ func bindValidate(c *gin.Context, obj any, bindFunc func(any) error) error {
 	return nil
 }
 
+func GinShouldBindHeader(c *gin.Context, obj any) error {
+	return bindValidate(c, obj, c.ShouldBindHeader)
+}
+
+func GinShouldBindUri(c *gin.Context, obj any) error {
+	return bindValidate(c, obj, c.ShouldBindUri)
+}
+
 func GinShouldBindQuery(c *gin.Context, obj any) error {
 	return bindValidate(c, obj, c.ShouldBindQuery)
 }
