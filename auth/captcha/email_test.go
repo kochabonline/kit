@@ -2,9 +2,9 @@ package captcha
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
+	"github.com/kochabonline/kit/core/bot/email"
 	"github.com/kochabonline/kit/core/tools"
 	"github.com/kochabonline/kit/store/redis"
 )
@@ -12,24 +12,20 @@ import (
 func TestEmail(t *testing.T) {
 	ctx := context.Background()
 	r, _ := redis.NewClient(&redis.Config{
-		Password: "xxx",
+		Password: "12345678",
 	})
 	cache := NewRedisCache(r.Client)
-	auth := SmtpPlainAuth{
-		Password: "xxxx",
-		Username: "xxx",
-		Host:     "xxx",
-		Port:     25,
-	}
-	email := NewEmailAuthenticator(auth, cache)
+	e := email.New(email.SmtpPlainAuth{})
+	email := NewEmailAuthenticator(e, cache)
 
 	code := tools.GenerateRandomCode(6)
-	e := Email{
-		To:      "xxx",
+	em := Email{
+		To:      "",
 		Subject: "code",
-		Body:    fmt.Sprintf("xxx：%s", code),
+		Tip:     "Your verification code is: ",
+		Code:    code,
 	}
-	ttl, err := email.Send(ctx, e, code)
+	ttl, err := email.Send(ctx, em)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,33 +3,24 @@ package captcha
 import (
 	"context"
 	"fmt"
-	"net/smtp"
-	"strings"
 	"time"
 
+	"github.com/kochabonline/kit/core/bot/email"
 	"github.com/kochabonline/kit/errors"
 )
 
 type Email struct {
 	To      string
 	Subject string
-	Body    string
-}
-
-type SmtpPlainAuth struct {
-	Identity string
-	Username string
-	Password string
-	Host     string
-	Port     int
+	Tip     string
+	Code    string
 }
 
 type EmailAuthenticator struct {
-	auth          smtp.Auth
-	smtpPlainAuth SmtpPlainAuth
-	cache         Cache
-	prefix        string
-	expires       time.Duration
+	email   *email.Email
+	cache   Cache
+	prefix  string
+	expires time.Duration
 }
 
 type Option func(*EmailAuthenticator)
@@ -46,13 +37,12 @@ func WithExpires(expires time.Duration) Option {
 	}
 }
 
-func NewEmailAuthenticator(smtpPlainAuth SmtpPlainAuth, cache Cache, opts ...Option) *EmailAuthenticator {
+func NewEmailAuthenticator(email *email.Email, cache Cache, opts ...Option) *EmailAuthenticator {
 	e := &EmailAuthenticator{
-		auth:          smtp.PlainAuth(smtpPlainAuth.Identity, smtpPlainAuth.Username, smtpPlainAuth.Password, smtpPlainAuth.Host),
-		prefix:        "email",
-		smtpPlainAuth: smtpPlainAuth,
-		cache:         cache,
-		expires:       time.Minute * 10,
+		email:   email,
+		prefix:  "email",
+		cache:   cache,
+		expires: time.Minute * 10,
 	}
 	for _, opt := range opts {
 		opt(e)
@@ -61,16 +51,12 @@ func NewEmailAuthenticator(smtpPlainAuth SmtpPlainAuth, cache Cache, opts ...Opt
 	return e
 }
 
-func (a *SmtpPlainAuth) addr() string {
-	return fmt.Sprintf("%s:%d", a.Host, a.Port)
-}
-
 func (e *EmailAuthenticator) key(suffix string) string {
 	return fmt.Sprintf("%s:%s", e.prefix, suffix)
 }
 
-func (e *EmailAuthenticator) Send(ctx context.Context, email Email, code string) (time.Duration, error) {
-	key := e.key(email.To)
+func (e *EmailAuthenticator) Send(ctx context.Context, em Email) (time.Duration, error) {
+	key := e.key(em.To)
 
 	ttl, err := e.cache.GetTTL(ctx, key)
 	if err != nil {
@@ -80,16 +66,15 @@ func (e *EmailAuthenticator) Send(ctx context.Context, email Email, code string)
 		return ttl, nil
 	}
 
-	if err := e.cache.Set(ctx, key, code, e.expires); err != nil {
+	if err := e.cache.Set(ctx, key, em.Code, e.expires); err != nil {
 		return 0, errors.BadRequest("email captcha cache set failed: %v", err)
 	}
 
-	err = smtp.SendMail(
-		e.smtpPlainAuth.addr(),
-		e.auth, e.smtpPlainAuth.Username,
-		[]string{email.To},
-		[]byte(buildEmailMessage(email)),
-	)
+	_, err = e.email.Send(email.NewMessage().With().
+		To([]string{em.To}).
+		Subject(em.Subject).
+		Body(fmt.Sprintf("%s%s", em.Tip, em.Code)).
+		Message())
 	if err != nil {
 		if err := e.cache.Delete(ctx, key); err != nil {
 			return 0, errors.BadRequest("email captcha cache delete failed: %v", err)
@@ -98,18 +83,6 @@ func (e *EmailAuthenticator) Send(ctx context.Context, email Email, code string)
 	}
 
 	return 0, nil
-}
-
-func buildEmailMessage(email Email) string {
-	var builder strings.Builder
-	builder.WriteString("To: ")
-	builder.WriteString(email.To)
-	builder.WriteString("\r\n")
-	builder.WriteString("Subject: ")
-	builder.WriteString(email.Subject)
-	builder.WriteString("\r\n\r\n")
-	builder.WriteString(email.Body)
-	return builder.String()
 }
 
 func (e *EmailAuthenticator) Validate(ctx context.Context, email string, code string) (bool, error) {

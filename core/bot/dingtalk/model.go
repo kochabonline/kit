@@ -14,8 +14,12 @@ type TextMessage struct {
 	} `json:"at"`
 }
 
+type TextMessageContext struct {
+	message *TextMessage
+}
+
 func (m *TextMessage) Marshal() ([]byte, error) {
-	m.MsgType = "text"
+	m.MsgType = Text
 	return json.Marshal(m)
 }
 
@@ -26,28 +30,36 @@ func (m *TextMessage) String() string {
 
 func NewTextMessage() *TextMessage {
 	return &TextMessage{
-		MsgType: "text",
+		MsgType: Text,
 	}
 }
 
-func (m *TextMessage) Content(content string) *TextMessage {
-	m.Text.Content = content
-	return m
+func (m *TextMessage) With() *TextMessageContext {
+	return &TextMessageContext{message: m}
 }
 
-func (m *TextMessage) AtMobiles(atMobiles []string) *TextMessage {
-	m.At.AtMobiles = atMobiles
-	return m
+func (c *TextMessageContext) Content(content string) *TextMessageContext {
+	c.message.Text.Content = content
+	return c
 }
 
-func (m *TextMessage) AtUserIds(atUserIds []string) *TextMessage {
-	m.At.AtUserIds = atUserIds
-	return m
+func (c *TextMessageContext) AtMobiles(atMobiles []string) *TextMessageContext {
+	c.message.At.AtMobiles = atMobiles
+	return c
 }
 
-func (m *TextMessage) IsAtAll(isAtAll bool) *TextMessage {
-	m.At.IsAtAll = isAtAll
-	return m
+func (c *TextMessageContext) AtUserIds(atUserIds []string) *TextMessageContext {
+	c.message.At.AtUserIds = atUserIds
+	return c
+}
+
+func (c *TextMessageContext) IsAtAll(isAtAll bool) *TextMessageContext {
+	c.message.At.IsAtAll = isAtAll
+	return c
+}
+
+func (c *TextMessageContext) Message() *TextMessage {
+	return c.message
 }
 
 type MarkdownMessage struct {
@@ -63,8 +75,12 @@ type MarkdownMessage struct {
 	} `json:"at"`
 }
 
+type MarkdownMessageContext struct {
+	message *MarkdownMessage
+}
+
 func (m *MarkdownMessage) Marshal() ([]byte, error) {
-	m.MsgType = "markdown"
+	m.MsgType = Markdown
 	return json.Marshal(m)
 }
 
@@ -75,33 +91,41 @@ func (m *MarkdownMessage) String() string {
 
 func NewMarkdownMessage() *MarkdownMessage {
 	return &MarkdownMessage{
-		MsgType: "markdown",
+		MsgType: Markdown,
 	}
 }
 
-func (m *MarkdownMessage) Title(title string) *MarkdownMessage {
-	m.Markdown.Title = title
-	return m
+func (m *MarkdownMessage) With() *MarkdownMessageContext {
+	return &MarkdownMessageContext{message: m}
 }
 
-func (m *MarkdownMessage) Text(text string) *MarkdownMessage {
-	m.Markdown.Text = text
-	return m
+func (c *MarkdownMessageContext) Title(title string) *MarkdownMessageContext {
+	c.message.Markdown.Title = title
+	return c
 }
 
-func (m *MarkdownMessage) AtMobiles(atMobiles []string) *MarkdownMessage {
-	m.At.AtMobiles = atMobiles
-	return m
+func (c *MarkdownMessageContext) Text(text string) *MarkdownMessageContext {
+	c.message.Markdown.Text = text
+	return c
 }
 
-func (m *MarkdownMessage) AtUserIds(atUserIds []string) *MarkdownMessage {
-	m.At.AtUserIds = atUserIds
-	return m
+func (c *MarkdownMessageContext) AtMobiles(atMobiles []string) *MarkdownMessageContext {
+	c.message.At.AtMobiles = atMobiles
+	return c
 }
 
-func (m *MarkdownMessage) IsAtAll(isAtAll bool) *MarkdownMessage {
-	m.At.IsAtAll = isAtAll
-	return m
+func (c *MarkdownMessageContext) AtUserIds(atUserIds []string) *MarkdownMessageContext {
+	c.message.At.AtUserIds = atUserIds
+	return c
+}
+
+func (c *MarkdownMessageContext) IsAtAll(isAtAll bool) *MarkdownMessageContext {
+	c.message.At.IsAtAll = isAtAll
+	return c
+}
+
+func (c *MarkdownMessageContext) Message() *MarkdownMessage {
+	return c.message
 }
 
 type LinkMessage struct {
@@ -114,8 +138,12 @@ type LinkMessage struct {
 	} `json:"link"`
 }
 
+type LinkMessageContext struct {
+	message *LinkMessage
+}
+
 func (m *LinkMessage) Marshal() ([]byte, error) {
-	m.MsgType = "link"
+	m.MsgType = Link
 	return json.Marshal(m)
 }
 
@@ -126,28 +154,36 @@ func (m *LinkMessage) String() string {
 
 func NewLinkMessage() *LinkMessage {
 	return &LinkMessage{
-		MsgType: "link",
+		MsgType: Link,
 	}
 }
 
-func (m *LinkMessage) Title(title string) *LinkMessage {
-	m.Link.Title = title
-	return m
+func (m *LinkMessage) With() *LinkMessageContext {
+	return &LinkMessageContext{message: m}
 }
 
-func (m *LinkMessage) Text(text string) *LinkMessage {
-	m.Link.Text = text
-	return m
+func (c *LinkMessageContext) Title(title string) *LinkMessageContext {
+	c.message.Link.Title = title
+	return c
 }
 
-func (m *LinkMessage) MessageURL(messageURL string) *LinkMessage {
-	m.Link.MessageURL = messageURL
-	return m
+func (c *LinkMessageContext) Text(text string) *LinkMessageContext {
+	c.message.Link.Text = text
+	return c
 }
 
-func (m *LinkMessage) PicURL(picURL string) *LinkMessage {
-	m.Link.PicURL = picURL
-	return m
+func (c *LinkMessageContext) MessageURL(messageURL string) *LinkMessageContext {
+	c.message.Link.MessageURL = messageURL
+	return c
+}
+
+func (c *LinkMessageContext) PicURL(picURL string) *LinkMessageContext {
+	c.message.Link.PicURL = picURL
+	return c
+}
+
+func (c *LinkMessageContext) Message() *LinkMessage {
+	return c.message
 }
 
 type ActionCardMessage struct {
@@ -160,8 +196,12 @@ type ActionCardMessage struct {
 	} `json:"actionCard"`
 }
 
+type ActionCardMessageContext struct {
+	message *ActionCardMessage
+}
+
 func (m *ActionCardMessage) Marshal() ([]byte, error) {
-	m.MsgType = "actionCard"
+	m.MsgType = ActionCard
 	return json.Marshal(m)
 }
 
@@ -172,28 +212,36 @@ func (m *ActionCardMessage) String() string {
 
 func NewActionCardMessage() *ActionCardMessage {
 	return &ActionCardMessage{
-		MsgType: "actionCard",
+		MsgType: ActionCard,
 	}
 }
 
-func (m *ActionCardMessage) Title(title string) *ActionCardMessage {
-	m.ActionCard.Title = title
-	return m
+func (m *ActionCardMessage) With() *ActionCardMessageContext {
+	return &ActionCardMessageContext{message: m}
 }
 
-func (m *ActionCardMessage) Text(text string) *ActionCardMessage {
-	m.ActionCard.Text = text
-	return m
+func (c *ActionCardMessageContext) Title(title string) *ActionCardMessageContext {
+	c.message.ActionCard.Title = title
+	return c
 }
 
-func (m *ActionCardMessage) SingleTitle(singleTitle string) *ActionCardMessage {
-	m.ActionCard.SingleTitle = singleTitle
-	return m
+func (c *ActionCardMessageContext) Text(text string) *ActionCardMessageContext {
+	c.message.ActionCard.Text = text
+	return c
 }
 
-func (m *ActionCardMessage) SingleURL(singleURL string) *ActionCardMessage {
-	m.ActionCard.SingleURL = singleURL
-	return m
+func (c *ActionCardMessageContext) SingleTitle(singleTitle string) *ActionCardMessageContext {
+	c.message.ActionCard.SingleTitle = singleTitle
+	return c
+}
+
+func (c *ActionCardMessageContext) SingleURL(singleURL string) *ActionCardMessageContext {
+	c.message.ActionCard.SingleURL = singleURL
+	return c
+}
+
+func (c *ActionCardMessageContext) Message() *ActionCardMessage {
+	return c.message
 }
 
 type FeedCardMessage struct {
@@ -207,8 +255,12 @@ type FeedCardMessage struct {
 	} `json:"feedCard"`
 }
 
+type FeedCardMessageContext struct {
+	message *FeedCardMessage
+}
+
 func (m *FeedCardMessage) Marshal() ([]byte, error) {
-	m.MsgType = "feedCard"
+	m.MsgType = FeedCard
 	return json.Marshal(m)
 }
 
@@ -219,15 +271,23 @@ func (m *FeedCardMessage) String() string {
 
 func NewFeedCardMessage() *FeedCardMessage {
 	return &FeedCardMessage{
-		MsgType: "feedCard",
+		MsgType: FeedCard,
 	}
 }
 
-func (m *FeedCardMessage) AddLink(title, messageURL, picURL string) *FeedCardMessage {
-	m.FeedCard.Links = append(m.FeedCard.Links, struct {
+func (m *FeedCardMessage) With() *FeedCardMessageContext {
+	return &FeedCardMessageContext{message: m}
+}
+
+func (c *FeedCardMessageContext) AddLink(title, messageURL, picURL string) *FeedCardMessageContext {
+	c.message.FeedCard.Links = append(c.message.FeedCard.Links, struct {
 		Title      string `json:"title"`
 		MessageURL string `json:"messageURL"`
 		PicURL     string `json:"picURL"`
 	}{title, messageURL, picURL})
-	return m
+	return c
+}
+
+func (c *FeedCardMessageContext) Message() *FeedCardMessage {
+	return c.message
 }

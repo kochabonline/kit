@@ -30,6 +30,7 @@ func Sign(secret string, opts ...func(*Option)) (string, int64) {
 	timestamp := time.Now().Unix()
 	var toSign strings.Builder
 	toSign.WriteString(strconv.FormatInt(timestamp, 10))
+	toSign.WriteString("\n")
 	toSign.WriteString(secret)
 	if opt.data != "" {
 		toSign.WriteString(opt.data)
@@ -51,6 +52,7 @@ func Verify(secret, signature string, timestamp int64, opts ...func(*Option)) er
 	}
 	var toSign strings.Builder
 	toSign.WriteString(strconv.FormatInt(timestamp, 10))
+	toSign.WriteString("\n")
 	toSign.WriteString(secret)
 	if opt.data != "" {
 		toSign.WriteString(opt.data)

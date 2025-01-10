@@ -13,7 +13,7 @@ import (
 	"github.com/kochabonline/kit/errors"
 )
 
-var _ bot.HttpClient = (*Telegram)(nil)
+var _ bot.Bot = (*Telegram)(nil)
 
 type Telegram struct {
 	Token string `json:"token"`
@@ -105,12 +105,8 @@ func (t *Telegram) url(method string, kvparams ...string) string {
 	return fmt.Sprintf("%s?%s", baseUrl, params.Encode())
 }
 
-func (t *Telegram) Do(req *http.Request) (*http.Response, error) {
-	return t.client.Do(req)
-}
-
-func (t *Telegram) Send(message bot.Message) (*http.Response, error) {
-	msgBytes, err := message.Marshal()
+func (t *Telegram) Send(msg bot.Sendable) (*http.Response, error) {
+	msgBytes, err := msg.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +117,7 @@ func (t *Telegram) Send(message bot.Message) (*http.Response, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := t.Do(req)
+	resp, err := t.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +132,7 @@ func (t *Telegram) receive(params ...string) (*ApiResponse[Update], error) {
 		return nil, err
 	}
 
-	resp, err := t.Do(req)
+	resp, err := t.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

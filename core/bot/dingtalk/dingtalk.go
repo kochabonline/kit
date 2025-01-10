@@ -14,7 +14,7 @@ import (
 	"github.com/kochabonline/kit/core/bot"
 )
 
-var _ bot.HttpClient = (*DingTalk)(nil)
+var _ bot.Bot = (*DingTalk)(nil)
 
 type DingTalk struct {
 	Webhook string `json:"webhook"`
@@ -86,12 +86,8 @@ func (d *DingTalk) url() string {
 	return fmt.Sprintf("%s&timestamp=%s&sign=%s", d.Webhook, timestamp, sign)
 }
 
-func (d *DingTalk) Do(req *http.Request) (*http.Response, error) {
-	return d.client.Do(req)
-}
-
-func (d *DingTalk) Send(message bot.Message) (*http.Response, error) {
-	msgBytes, err := message.Marshal()
+func (d *DingTalk) Send(msg bot.Sendable) (*http.Response, error) {
+	msgBytes, err := msg.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +98,7 @@ func (d *DingTalk) Send(message bot.Message) (*http.Response, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := d.Do(req)
+	resp, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

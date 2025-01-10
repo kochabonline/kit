@@ -4,14 +4,10 @@ import (
 	"net/http"
 )
 
-type HttpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 type Bot interface {
-	Send(msg Message) (*http.Response, error)
+	Send(sendable Sendable) (*http.Response, error)
 }
 
-type Message interface {
+type Sendable interface {
 	Marshal() ([]byte, error)
 }
