@@ -4,6 +4,7 @@ import "encoding/json"
 
 type Message struct {
 	Type    string   `json:"type"`
+	From    string   `json:"from"`
 	To      []string `json:"to"`
 	Subject string   `json:"subject"`
 	Body    string   `json:"body"`
@@ -27,6 +28,11 @@ func (m *Message) With() *MessageContext {
 
 func (c *MessageContext) Type(t string) *MessageContext {
 	c.message.Type = t
+	return c
+}
+
+func (c *MessageContext) From(from string) *MessageContext {
+	c.message.From = from
 	return c
 }
 

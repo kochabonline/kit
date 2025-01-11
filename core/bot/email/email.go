@@ -3,6 +3,7 @@ package email
 import (
 	"fmt"
 	"net/http"
+	"net/mail"
 	"net/smtp"
 	"regexp"
 	"strings"
@@ -59,7 +60,8 @@ func (e *Email) Send(msg bot.Sendable) (*http.Response, error) {
 	}
 
 	headers := make(map[string]string, 4)
-	headers["From"] = e.smtpPlainAuth.Username
+	from := mail.Address{Name: message.From, Address: e.smtpPlainAuth.Username}
+	headers["From"] = from.String()
 	var to []string
 	if len(e.to) > 0 {
 		if err := validEmails(e.to); err != nil {
