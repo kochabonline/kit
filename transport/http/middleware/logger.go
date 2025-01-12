@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/log"
 )
 
 type LoggerConfig struct {
@@ -68,6 +67,6 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		log.Infow(params...)
+		mlog.Infow(params...)
 	}
 }

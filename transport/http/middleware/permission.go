@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
-	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport/http/response"
 )
 
@@ -41,7 +40,7 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 
 		accountId, accountRole, err := ctxAccountInfo(c)
 		if err != nil {
-			log.Errorw("error", err.Error())
+			mlog.Errorw("error", err.Error())
 			response.GinJSONError(c, err)
 			return
 		}
@@ -52,7 +51,7 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 		}
 
 		if paramValue != strconv.FormatInt(accountId, 10) {
-			log.Errorw("accountId", accountId, "error", errors.Forbidden("role %d is not allowed to access %s", accountId, paramValue))
+			mlog.Errorw("accountId", accountId, "error", errors.Forbidden("role %d is not allowed to access %s", accountId, paramValue))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
@@ -75,13 +74,13 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		accountId, accountRole, err := ctxAccountInfo(c)
 		if err != nil {
-			log.Errorw("error", err.Error())
+			mlog.Errorw("error", err.Error())
 			response.GinJSONError(c, err)
 			return
 		}
 
 		if config.AllowedRole < accountRole {
-			log.Errorw("accountId", accountId, "accountRole", accountRole, "error", errors.Forbidden("role %d is not allowed to access", accountRole))
+			mlog.Errorw("accountId", accountId, "accountRole", accountRole, "error", errors.Forbidden("role %d is not allowed to access", accountRole))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}

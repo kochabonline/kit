@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/log"
 )
 
 type RecoveryConfig struct {
@@ -32,7 +31,7 @@ func GinRecoveryWithConfig(config RecoveryConfig) gin.HandlerFunc {
 				brokenPipe := isBrokenPipe(err)
 
 				if brokenPipe {
-					log.Errorw(
+					mlog.Errorw(
 						"request", string(httpRequest),
 						"errors", err,
 					)
@@ -43,13 +42,13 @@ func GinRecoveryWithConfig(config RecoveryConfig) gin.HandlerFunc {
 				}
 
 				if config.Stack {
-					log.Errorw(
+					mlog.Errorw(
 						"request", string(httpRequest),
 						"errors", err,
 						"stack", string(debug.Stack()),
 					)
 				} else {
-					log.Errorw(
+					mlog.Errorw(
 						"request", string(httpRequest),
 						"errors", err,
 					)

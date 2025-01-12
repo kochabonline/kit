@@ -3,7 +3,17 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/core/tools"
+	"github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/log/zerolog"
 )
+
+var (
+	mlog = log.NewHelper(zerolog.New())
+)
+
+func SetLogger(logger log.Logger) {
+	mlog = log.NewHelper(logger)
+}
 
 func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {
 	if len(prefixes) == 0 {
