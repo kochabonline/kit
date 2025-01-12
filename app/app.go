@@ -15,12 +15,17 @@ import (
 	"github.com/kochabonline/kit/transport"
 )
 
+var (
+	closeFuncs      = make([]func(), 0)
+	closeFuncsMutex sync.Mutex
+)
+
 type App struct {
 	ctx             context.Context
 	servers         []transport.Server
 	sigs            []os.Signal
+	closeFuncs      []func()
 	shutdownTimeout time.Duration
-	cleanFunc       []func()
 	log             log.Helper
 }
 
@@ -44,15 +49,15 @@ func WithSignal(sig ...os.Signal) Option {
 	}
 }
 
-func WithShutdownTimeout(timeout time.Duration) Option {
+func WithCloseFuncs(f ...func()) Option {
 	return func(a *App) {
-		a.shutdownTimeout = timeout
+		a.closeFuncs = append(a.closeFuncs, f...)
 	}
 }
 
-func WithCleanFunc(clean ...func()) Option {
+func WithShutdownTimeout(timeout time.Duration) Option {
 	return func(a *App) {
-		a.cleanFunc = append(a.cleanFunc, clean...)
+		a.shutdownTimeout = timeout
 	}
 }
 
@@ -68,6 +73,7 @@ func NewApp(servers []transport.Server, opts ...Option) *App {
 		servers:         servers,
 		sigs:            []os.Signal{os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT},
 		shutdownTimeout: 30 * time.Second,
+		closeFuncs:      make([]func(), 0),
 		log:             log.DefaultLogger,
 	}
 
@@ -110,18 +116,7 @@ func (a *App) Run() error {
 		select {
 		case signal := <-ch:
 			a.log.Infof("received signal %s, shutting down", signal)
-
-			// Wait for all clean functions to finish
-			cwg := sync.WaitGroup{}
-			for _, clean := range a.cleanFunc {
-				cwg.Add(1)
-				go func(fn func()) {
-					defer cwg.Done()
-					fn()
-				}(clean)
-			}
-			cwg.Wait()
-
+			a.close()
 			return context.Canceled
 		case <-ctx.Done():
 			return nil
@@ -134,4 +129,25 @@ func (a *App) Run() error {
 	}
 
 	return nil
+}
+
+// Close closes the app.
+func (a *App) close() {
+	wg := sync.WaitGroup{}
+	closeFuncs := append(closeFuncs, a.closeFuncs...)
+	wg.Add(len(closeFuncs))
+	for _, close := range closeFuncs {
+		go func(fn func()) {
+			defer wg.Done()
+			fn()
+		}(close)
+	}
+	wg.Wait()
+}
+
+// AddCloseFuncs adds close functions to the global close functions.
+func AddCloseFuncs(f ...func()) {
+	closeFuncsMutex.Lock()
+	defer closeFuncsMutex.Unlock()
+	closeFuncs = append(closeFuncs, f...)
 }
