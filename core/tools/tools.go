@@ -47,3 +47,21 @@ func GenerateRandomCode(length int) string {
 	}
 	return string(code)
 }
+
+// MobileDesensitization desensitizes the mobile number by replacing the middle part with "*".
+func MobileDesensitization(mobile string) string {
+	length := len(mobile)
+	if length < 7 {
+		return mobile
+	}
+	return mobile[:3] + "****" + mobile[length-3:]
+}
+
+// EmailDesensitization desensitizes the email by replacing the middle part with "*".
+func EmailDesensitization(email string) string {
+	index := strings.IndexByte(email, '@')
+	if index == -1 || index < 4 {
+		return email
+	}
+	return email[:3] + "****" + email[index:]
+}
