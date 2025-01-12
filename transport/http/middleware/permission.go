@@ -46,13 +46,13 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 			return
 		}
 
-		if config.SkippedRole <= accountRole {
+		if config.SkippedRole >= accountRole {
 			c.Next()
 			return
 		}
 
 		if paramValue != strconv.FormatInt(accountId, 10) {
-			log.Errorw("accountId", accountId, "error", errors.Forbidden("%d is not allowed to access %s", accountId, paramValue))
+			log.Errorw("accountId", accountId, "error", errors.Forbidden("role %d is not allowed to access %s", accountId, paramValue))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
@@ -80,8 +80,8 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 			return
 		}
 
-		if config.AllowedRole >= accountRole {
-			log.Errorw("accountId", accountId, "accountRole", accountRole, "error", errors.Forbidden("%d is not allowed to access", accountRole))
+		if config.AllowedRole < accountRole {
+			log.Errorw("accountId", accountId, "accountRole", accountRole, "error", errors.Forbidden("role %d is not allowed to access", accountRole))
 			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
