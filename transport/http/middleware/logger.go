@@ -13,7 +13,7 @@ type LoggerConfig struct {
 	HeaderEnabled  bool
 	BodyEnabled    bool
 	HandlerEnabled bool
-
+	// Option to filter requests to be logged
 	Option LoggerOption
 }
 

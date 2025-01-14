@@ -3,12 +3,7 @@ package middleware
 import (
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/transport/http/response"
-)
-
-const (
-	ErrCasbinForbidden = "forbidden"
 )
 
 type CasbinConfig struct {
@@ -30,19 +25,19 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 		accountId, sub, err := ctxAccountInfo(c)
 		if err != nil {
 			mlog.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", err.Error())
-			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden))
+			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 
 		ok, err := config.E.Enforce(sub, obj, act)
 		if err != nil {
 			mlog.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", err.Error())
-			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden))
+			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 		if !ok {
 			mlog.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", "casbin denied access")
-			response.GinJSONError(c, errors.Forbidden(ErrCasbinForbidden))
+			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 

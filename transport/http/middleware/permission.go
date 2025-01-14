@@ -1,24 +1,12 @@
 package middleware
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/transport/http/response"
 )
 
-const (
-	defaultParam = "id"
-)
-
-const (
-	ErrPermissionForbidden = "forbidden"
-)
-
 type PermissionHPEConfig struct {
-	// Param is the param key to look for the id value
-	Param       string
 	SkippedRole int
 }
 
@@ -27,32 +15,17 @@ func PermissionHPE() gin.HandlerFunc {
 }
 
 func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
-	if config.Param == "" {
-		config.Param = defaultParam
-	}
 
 	return func(c *gin.Context) {
-		paramValue := c.Param(config.Param)
-		if paramValue == "" {
-			c.Next()
-			return
-		}
-
-		accountId, accountRole, err := ctxAccountInfo(c)
+		_, accountRole, err := ctxAccountInfo(c)
 		if err != nil {
 			mlog.Errorw("error", err.Error())
-			response.GinJSONError(c, err)
+			response.GinJSONError(c, ErrorUnauthorized)
 			return
 		}
 
 		if config.SkippedRole >= accountRole {
 			c.Next()
-			return
-		}
-
-		if paramValue != strconv.FormatInt(accountId, 10) {
-			mlog.Errorw("accountId", accountId, "error", errors.Forbidden("role %d is not allowed to access %s", accountId, paramValue))
-			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
 			return
 		}
 
@@ -75,13 +48,13 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 		accountId, accountRole, err := ctxAccountInfo(c)
 		if err != nil {
 			mlog.Errorw("error", err.Error())
-			response.GinJSONError(c, err)
+			response.GinJSONError(c, ErrorUnauthorized)
 			return
 		}
 
 		if config.AllowedRole < accountRole {
 			mlog.Errorw("accountId", accountId, "accountRole", accountRole, "error", errors.Forbidden("role %d is not allowed to access", accountRole))
-			response.GinJSONError(c, errors.Forbidden(ErrPermissionForbidden))
+			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 

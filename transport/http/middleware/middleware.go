@@ -3,8 +3,14 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/core/tools"
+	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/log/zerolog"
+)
+
+var (
+	ErrorForbidden    = errors.Forbidden("forbidden")
+	ErrorUnauthorized = errors.Unauthorized("unauthorized")
 )
 
 var (
