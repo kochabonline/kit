@@ -99,11 +99,21 @@ func (r *JwtRedis) key(id int64, key string) string {
 }
 
 func (r *JwtRedis) getIdByClaims(claims jwt.MapClaims) (int64, error) {
-	id := JwtMapClaimsParse[int64](claims, r.idkey)
-	if id == 0 {
-		return 0, fmt.Errorf("invalid id, expected %s", r.idkey)
+	id, ok := claims[r.idkey]
+	if !ok {
+		return 0, fmt.Errorf("claims does not contain %s", r.idkey)
 	}
-	return id, nil
+
+	switch v := id.(type) {
+	case int64:
+		return v, nil
+	case float64:
+		return int64(v), nil
+	case string:
+		return strconv.ParseInt(v, 10, 64)
+	default:
+		return 0, fmt.Errorf("claims %s type is not int64", r.idkey)
+	}
 }
 
 // exists checks if jti exists in redis, used to determine if the token is valid
