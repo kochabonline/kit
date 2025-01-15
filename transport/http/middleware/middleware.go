@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/kochabonline/kit/core/tools"
+	"github.com/kochabonline/kit/core/util"
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/log/zerolog"
@@ -36,13 +36,13 @@ func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {
 	return false
 }
 
-func ctxAccountInfo(c *gin.Context) (id int64, role int, err error) {
+func ctxAccountInfo(c *gin.Context) (id int64, roles []string, err error) {
 	ctx := c.Request.Context()
-	id, err = tools.CtxValue[int64](ctx, "id")
+	id, err = util.CtxValue[int64](ctx, "id")
 	if err != nil {
 		return
 	}
-	role, err = tools.CtxValue[int](ctx, "role")
+	roles, err = util.CtxValue[[]string](ctx, "roles")
 	if err != nil {
 		return
 	}

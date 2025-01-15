@@ -21,6 +21,31 @@ func Contains[T comparable](a T, slices []T) bool {
 	return found
 }
 
+// ContainsSlice compares a list of values with another list of values and returns true if any value is found in the other list.
+func ContainsSlice[T comparable](a []T, slices []T) bool {
+	const threshold = 50
+
+	if len(slices) < threshold {
+		for _, b := range slices {
+			if Contains(b, a) {
+				return true
+			}
+		}
+		return false
+	}
+
+	set := make(map[T]struct{}, len(slices))
+	for _, b := range slices {
+		set[b] = struct{}{}
+	}
+	for _, item := range a {
+		if _, found := set[item]; found {
+			return true
+		}
+	}
+	return false
+}
+
 // MergeSlices merges multiple slices into a single slice.
 func Merge[T comparable](slices ...[]T) []T {
 	totalLength := 0

@@ -1,6 +1,7 @@
-package tools
+package util
 
 import (
+	"encoding/base64"
 	"math/rand"
 	"net"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/skip2/go-qrcode"
 )
 
 func Id() string {
@@ -46,6 +48,15 @@ func GenerateRandomCode(length int) string {
 		code[i] = digits[r.Intn(len(digits))]
 	}
 	return string(code)
+}
+
+// QRCode generates a QR code and returns a Base64 encoded string
+func QRCode(content string, size int) (string, error) {
+	bytes, err := qrcode.Encode(content, qrcode.Medium, size)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 // MobileDesensitization desensitizes the mobile number by replacing the middle part with "*".

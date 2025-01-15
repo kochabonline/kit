@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kochabonline/kit/core/tools"
+	"github.com/kochabonline/kit/core/util"
 )
 
 // otpauth://totp/{label}?secret={secret}&issuer={issuer}&algorithm={algorithm}&digits={digits}&period={period}
@@ -135,7 +135,7 @@ func (ga *GoogleAuthenticator) generateQRData(label string, issuer string, secre
 
 // GenerateQRrl generates a new QR code
 func (ga *GoogleAuthenticator) GenerateQRCode(label string, issuer string, secret string) (string, error) {
-	return tools.QRCode(ga.generateQRData(label, issuer, secret), ga.QrCodeSize)
+	return util.QRCode(ga.generateQRData(label, issuer, secret), ga.QrCodeSize)
 }
 
 // ValidateCode validates a code

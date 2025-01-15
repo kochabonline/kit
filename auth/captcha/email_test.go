@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/kochabonline/kit/core/bot/email"
-	"github.com/kochabonline/kit/core/tools"
+	"github.com/kochabonline/kit/core/util"
 	"github.com/kochabonline/kit/store/redis"
 )
 
@@ -18,7 +18,7 @@ func TestEmail(t *testing.T) {
 	e := email.New(email.SmtpPlainAuth{})
 	email := NewEmailAuthenticator(e, cache)
 
-	code := tools.GenerateRandomCode(6)
+	code := util.GenerateRandomCode(6)
 	em := Email{
 		To:      "",
 		Subject: "code",
