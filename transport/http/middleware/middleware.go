@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrorForbidden    = errors.Forbidden("forbidden")
 	ErrorUnauthorized = errors.Unauthorized("unauthorized")
+	ErrorForbidden    = errors.Forbidden("forbidden")
 )
 
 var (

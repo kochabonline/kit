@@ -2,7 +2,7 @@ package jwt
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -10,10 +10,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-)
-
-var (
-	ErrInvalidId = errors.New("invalid id")
 )
 
 type Auth struct {
@@ -24,6 +20,7 @@ type Auth struct {
 type JwtRedis struct {
 	jwt           *Jwt
 	client        *redis.Client
+	idkey         string
 	prefix        string
 	accessPrefix  string
 	refreshPrefix string
@@ -33,6 +30,12 @@ type JwtRedis struct {
 }
 
 type JwtRedisOption func(*JwtRedis)
+
+func WithIdKey(idkey string) JwtRedisOption {
+	return func(j *JwtRedis) {
+		j.idkey = idkey
+	}
+}
 
 // WithPrefix set prefix for redis key
 func WithPrefix(prefix string) JwtRedisOption {
@@ -69,6 +72,7 @@ func NewJwtRedis(jwt *Jwt, client *redis.Client, opts ...JwtRedisOption) *JwtRed
 	jwtRedis := &JwtRedis{
 		jwt:           jwt,
 		client:        client,
+		idkey:         "id",
 		prefix:        "jwt",
 		accessPrefix:  "access",
 		refreshPrefix: "refresh",
@@ -95,25 +99,11 @@ func (r *JwtRedis) key(id int64, key string) string {
 }
 
 func (r *JwtRedis) getIdByClaims(claims jwt.MapClaims) (int64, error) {
-	id, ok := claims["id"]
-	if !ok {
-		return 0, ErrInvalidId
+	id := JwtMapClaimsParse[int64](claims, r.idkey)
+	if id == 0 {
+		return 0, fmt.Errorf("invalid id, expected %s", r.idkey)
 	}
-
-	switch v := id.(type) {
-	case int64:
-		return v, nil
-	case float64:
-		return int64(v), nil
-	case string:
-		parsed, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		return parsed, nil
-	default:
-		return 0, ErrInvalidId
-	}
+	return id, nil
 }
 
 // exists checks if jti exists in redis, used to determine if the token is valid

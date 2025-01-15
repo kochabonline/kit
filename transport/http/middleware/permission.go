@@ -52,7 +52,12 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 			return
 		}
 		if OperatorValue != OwnerKey {
-			mlog.Errorw("operator", OperatorValue, "owner", OwnerKey, "error", errors.Forbidden("operator %s is not allowed to access", OperatorValue))
+			mlog.Errorw(
+				"message", "operator is not owner",
+				"operator", OperatorValue,
+				"owner", OwnerKey, "error",
+				errors.Forbidden("operator %s is not allowed to access", OperatorValue),
+			)
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
@@ -81,7 +86,13 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 		}
 
 		if !slice.ContainsSlice(config.AllowedRoles, accountRoles) {
-			mlog.Errorw("accountId", accountId, "accountRoles", accountRoles, "error", errors.Forbidden("roles %s is not allowed to access", strings.Join(accountRoles, ",")))
+			mlog.Errorw(
+				"id", accountId,
+				"roles", accountRoles,
+				"url", c.Request.URL.Path,
+				"method", c.Request.Method,
+				"error", errors.Forbidden("roles %s is not allowed to access", strings.Join(accountRoles, ",")),
+			)
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
