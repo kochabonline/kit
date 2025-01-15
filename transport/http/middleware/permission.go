@@ -12,8 +12,10 @@ import (
 
 type PermissionHPEConfig struct {
 	SkippedRoles []string
-	OperatorKey  string
-	OwnerKey     string
+	// value must be string
+	OperatorKey string
+	// value must be slice of string
+	OwnerKey string
 }
 
 func PermissionHPE(roles []string, operatorKey string, ownerKey string) gin.HandlerFunc {
@@ -25,6 +27,13 @@ func PermissionHPE(roles []string, operatorKey string, ownerKey string) gin.Hand
 }
 
 func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
+	if config.OperatorKey == "" {
+		config.OperatorKey = "operator"
+	}
+	if config.OwnerKey == "" {
+		config.OwnerKey = "owner"
+	}
+
 	return func(c *gin.Context) {
 		_, accountRoles, err := ctxAccountInfo(c)
 		if err != nil {
@@ -39,24 +48,24 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 		}
 
 		ctx := c.Request.Context()
-		OperatorValue, err := util.CtxValue[string](ctx, config.OperatorKey)
+		Operator, err := util.CtxValue[string](ctx, config.OperatorKey)
 		if err != nil {
 			mlog.Errorw("message", "operator key not found", "key", config.OperatorKey, "error", err.Error())
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
-		OwnerKey, err := util.CtxValue[string](ctx, config.OwnerKey)
+		Owner, err := util.CtxValue[[]string](ctx, config.OwnerKey)
 		if err != nil {
 			mlog.Errorw("message", "owner key not found", "key", config.OwnerKey, "error", err.Error())
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
-		if OperatorValue != OwnerKey {
+		if !slice.Contains(Operator, Owner) {
 			mlog.Errorw(
 				"message", "operator is not owner",
-				"operator", OperatorValue,
-				"owner", OwnerKey, "error",
-				errors.Forbidden("operator %s is not allowed to access", OperatorValue),
+				"operator", Operator,
+				"owner", Owner, "error",
+				errors.Forbidden("operator %s is not allowed to access", Operator),
 			)
 			response.GinJSONError(c, ErrorForbidden)
 			return
