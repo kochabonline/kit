@@ -11,6 +11,8 @@ import (
 var (
 	ErrorUnauthorized = errors.Unauthorized("unauthorized")
 	ErrorForbidden    = errors.Forbidden("forbidden")
+	ErrorCrypto       = errors.Internal("decrypt request body failed")
+	ErrorSignature    = errors.Internal("verify signature failed")
 )
 
 var (

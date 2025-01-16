@@ -36,9 +36,13 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 		// Reading the request body must be done before c.Next(), otherwise the body will be cleared
 		if config.BodyEnabled {
 			// After reading, write it back to the request body
-			body, _ := c.GetRawData()
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
-			params = append(params, "body", string(body))
+			body, err := c.GetRawData()
+			if err != nil {
+				params = append(params, "error", err.Error())
+			} else {
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+				params = append(params, "body", string(body))
+			}
 		}
 
 		start := time.Now()
