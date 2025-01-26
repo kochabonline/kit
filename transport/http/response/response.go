@@ -9,15 +9,15 @@ import (
 
 type Response struct {
 	Code    int    `json:"code"`
-	Message string `json:"message,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	Data    any    `json:"data"`
+	Message string `json:"message"`
 }
 
-func NewResponse(code int, message string, data any) *Response {
+func NewResponse(code int, data any, message string) *Response {
 	return &Response{
 		Code:    code,
-		Message: message,
 		Data:    data,
+		Message: message,
 	}
 }
 
@@ -34,7 +34,7 @@ func JSONError(ctx any, err error) {
 }
 
 func GinJSON(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, NewResponse(http.StatusOK, "", data))
+	c.JSON(http.StatusOK, NewResponse(http.StatusOK, data, ""))
 }
 
 func GinJSONError(c *gin.Context, err error) {
@@ -43,10 +43,10 @@ func GinJSONError(c *gin.Context, err error) {
 	e := errors.FromError(err)
 	httpCode := int(e.Code)
 
-	// If http status text is empty, default to 500
+	// If http status text is empty, default to 200
 	if http.StatusText(httpCode) == "" {
 		httpCode = http.StatusInternalServerError
 	}
 
-	c.JSON(httpCode, NewResponse(int(e.Code), e.Message, nil))
+	c.JSON(httpCode, NewResponse(int(e.Code), nil, e.Message))
 }
