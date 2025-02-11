@@ -112,7 +112,7 @@ func (h *Http) Request(method, url string, body io.Reader, opts ...func(*Request
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.BadRequest(string(respByte))
+		return errors.BadRequest("%s", string(respByte))
 	}
 
 	if opt.response != nil {
