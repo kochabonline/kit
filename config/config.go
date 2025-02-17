@@ -37,7 +37,7 @@ func WithLogger(log log.Helper) ConfigOption {
 	}
 }
 
-func NewConfig(option Option, opts ...ConfigOption) *Config {
+func New(option Option, opts ...ConfigOption) *Config {
 	c := &Config{
 		Option: option,
 		log:    log.DefaultLogger,

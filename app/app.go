@@ -67,7 +67,7 @@ func WithLogger(log log.Helper) Option {
 	}
 }
 
-func NewApp(servers []transport.Server, opts ...Option) *App {
+func New(servers []transport.Server, opts ...Option) *App {
 	app := &App{
 		ctx:             context.Background(),
 		servers:         servers,

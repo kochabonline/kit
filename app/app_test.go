@@ -10,6 +10,6 @@ import (
 
 func TestApp(t *testing.T) {
 	httpServer := http.NewServer("", gin.New())
-	app := NewApp([]transport.Server{httpServer})
+	app := New([]transport.Server{httpServer})
 	app.Run()
 }
