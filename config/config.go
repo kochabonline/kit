@@ -24,7 +24,7 @@ type Config struct {
 
 type Option struct {
 	Provider Provider // Provider is the type of configuration provider.
-	Path     string   // Path is the path to the configuration file.
+	Path     []string // Path is the path to the configuration file.
 	Name     string   // Name is the name of the configuration file.
 	Target   any      // Target is the target of the configuration.
 }
@@ -44,7 +44,7 @@ func New(option Option, opts ...ConfigOption) *Config {
 	}
 
 	if err := c.init(); err != nil {
-		c.log.Fatalf(err.Error())
+		c.log.Fatal(err)
 	}
 
 	for _, opt := range opts {
@@ -61,13 +61,15 @@ func (c *Config) init() error {
 }
 
 func (c *Config) setDefault() {
-	if c.Option.Path == "" {
-		c.Option.Path = "."
+	if c.Option.Path == nil {
+		c.Option.Path = []string{"."}
 	}
 	extension := path.Ext(c.Option.Name)
 	configType := strings.TrimPrefix(extension, ".")
 
-	viper.AddConfigPath(c.Option.Path)
+	for _, path := range c.Option.Path {
+		viper.AddConfigPath(path)
+	}
 	viper.SetConfigName(c.Option.Name)
 	viper.SetConfigType(configType)
 	viper.AutomaticEnv()
