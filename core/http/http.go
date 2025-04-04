@@ -2,9 +2,12 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
+	"sync"
 
 	"github.com/kochabonline/kit/errors"
 )
@@ -21,105 +24,163 @@ const (
 	MethodTrace   = "TRACE"
 )
 
-type Client interface {
-	Request(method, url string, body io.Reader, opts ...func(*RequestOption)) (any, error)
+type Clienter interface {
+	Request(method, url string, body any, opts ...func(*RequestOption)) (*http.Response, error)
 }
 
-type Http struct {
-	client *http.Client
+type Client struct {
+	client         *http.Client
+	requestOptPool sync.Pool
+	bufferPool     sync.Pool
 }
 
-type Option func(*Http)
+type Option func(*Client)
 
 // WithClient sets the HTTP client.
-func WithClient(client *http.Client) func(*Http) {
-	return func(h *Http) {
+func WithClient(client *http.Client) func(*Client) {
+	return func(h *Client) {
 		h.client = client
 	}
 }
 
-// New creates a new HTTP client.
-func New(opts ...Option) *Http {
-	h := &Http{
+// New creates a new HTTP.
+func New(opts ...Option) *Client {
+	h := &Client{
 		client: &http.Client{},
+		requestOptPool: sync.Pool{
+			New: func() any {
+				return &RequestOption{
+					header: make(map[string]string),
+				}
+			},
+		},
+		bufferPool: sync.Pool{
+			New: func() any {
+				return bytes.NewBuffer(make([]byte, 0, 4096))
+			},
+		},
 	}
-	for _, o := range opts {
-		o(h)
+
+	for _, opt := range opts {
+		opt(h)
 	}
+
 	return h
 }
 
-// RequestOption is the option for the HTTP request.
 type RequestOption struct {
+	ctx      context.Context
 	header   map[string]string
 	response any
 }
 
-// WithHeader sets the request header.
-func WithHeader(header map[string]string) func(*RequestOption) {
+// WithContext sets a custom context for this specific request.
+func WithContext(ctx context.Context) func(*RequestOption) {
 	return func(opt *RequestOption) {
-		opt.header = header
+		opt.ctx = ctx
 	}
 }
 
-// WithResponse sets the response object to unmarshal the response body.
-// The response object must be a pointer.
+// WithHeader sets multiple headers.
+func WithHeader(header map[string]string) func(*RequestOption) {
+	return func(opt *RequestOption) {
+		maps.Copy(opt.header, header)
+	}
+}
+
+// WithResponse sets the response object.
 func WithResponse(response any) func(*RequestOption) {
 	return func(opt *RequestOption) {
 		opt.response = response
 	}
 }
 
-// Request sends an HTTP request.
-func (h *Http) Request(method, url string, body io.Reader, opts ...func(*RequestOption)) error {
-	opt := &RequestOption{
-		header: map[string]string{
-			"Content-Type": "application/json",
-		},
+func (opt *RequestOption) reset() {
+	opt.ctx = nil
+	for k := range opt.header {
+		delete(opt.header, k)
 	}
+	opt.response = nil
+}
+
+// Request sends an HTTP request and returns the response.
+func (cli *Client) Request(method, url string, body any, opts ...func(*RequestOption)) (*http.Response, error) {
+	// Get RequestOption object from the pool
+	optInterface := cli.requestOptPool.Get()
+	opt := optInterface.(*RequestOption)
+	// Reset the RequestOption object to its initial state
+	opt.reset()
+	opt.header["Content-Type"] = "application/json"
+	// Put RequestOption back to the pool when the function returns
+	defer cli.requestOptPool.Put(opt)
 
 	for _, o := range opts {
 		o(opt)
 	}
 
-	var reqBody []byte
+	var req *http.Request
 	var err error
-	if body != nil {
-		reqBody, err = json.Marshal(body)
-		if err != nil {
-			return err
+
+	switch v := body.(type) {
+	case nil:
+		req, err = http.NewRequest(method, url, nil)
+	case io.Reader:
+		req, err = http.NewRequest(method, url, v)
+	default:
+		// Get buffer from the pool
+		buf := cli.bufferPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer cli.bufferPool.Put(buf)
+
+		// Write the body to the buffer
+		enc := json.NewEncoder(buf)
+		if jsonErr := enc.Encode(v); jsonErr != nil {
+			return nil, errors.BadRequest("encode request body: %v", jsonErr)
 		}
+
+		req, err = http.NewRequest(method, url, buf)
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for k, v := range opt.header {
 		req.Header.Set(k, v)
 	}
 
-	resp, err := h.client.Do(req)
+	// Set the context for the request
+	if opt.ctx != nil {
+		req = req.WithContext(opt.ctx)
+	}
+
+	resp, err := cli.client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	respByte, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
+	// Check if the response status is not in the 2xx range
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		buf := cli.bufferPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer cli.bufferPool.Put(buf)
 
-	if resp.StatusCode != http.StatusOK {
-		return errors.BadRequest("%s", string(respByte))
+		// Read the response body into the buffer
+		if _, err = io.Copy(buf, resp.Body); err != nil {
+			return nil, errors.BadRequest("copy response body: %v", err)
+		}
+
+		return nil, errors.New(resp.StatusCode, "%s", buf.String())
 	}
 
 	if opt.response != nil {
-		if err = json.Unmarshal(respByte, &opt.response); err != nil {
-			return err
+		// Decode directly from response body to target object, avoiding intermediate memory allocation
+		dec := json.NewDecoder(resp.Body)
+		if err = dec.Decode(opt.response); err != nil {
+			return nil, errors.BadRequest("decode response body: %v", err)
 		}
 	}
 
-	return nil
+	return resp, nil
 }
