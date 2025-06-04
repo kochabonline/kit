@@ -9,6 +9,10 @@ install: ## Install dependencies
 	@go install github.com/google/wire/cmd/wire@latest
 	@go install github.com/swaggo/swag/cmd/swag@latest
 
+upgrade: ## Upgrade dependencies
+	@go get -u ./...
+	@go mod tidy
+
 proto: ## Generate gRPC code
 	@protoc -I=. -I=../.. --go_out=. --go_opt=module=${PKG} --go-grpc_out=. --go-grpc_opt=module=${PKG} */*.proto
 	@protoc-go-inject-tag -input="*/*.pb.go"

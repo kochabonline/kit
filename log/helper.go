@@ -7,7 +7,7 @@ import (
 	"github.com/kochabonline/kit/log/level"
 )
 
-const defaultMsgKey = "message"
+const defaultMsgKey = "msg"
 
 type Helper struct {
 	logger  Logger

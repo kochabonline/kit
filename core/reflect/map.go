@@ -36,7 +36,7 @@ func StructConvMap(target any, opts ...func(*MapConfig)) (map[string]any, error)
 	typeOf := valueOf.Type()
 
 	result := make(map[string]any, typeOf.NumField())
-	for i := 0; i < typeOf.NumField(); i++ {
+	for i := range typeOf.NumField() {
 		field := typeOf.Field(i)
 		tag := field.Tag.Get(config.tag)
 		if tag == "" {
