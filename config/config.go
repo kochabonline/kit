@@ -17,76 +17,101 @@ const (
 	ProviderFile Provider = iota
 )
 
+// Pre-defined environment key replacer to avoid repeated creation
+var envKeyReplacer = strings.NewReplacer(".", "_")
+
 type Config struct {
 	Option Option `json:"option"`
-	log    log.Helper
+	viper  *viper.Viper
 }
 
 type Option struct {
-	Provider Provider // Provider is the type of configuration provider.
-	Path     []string // Path is the path to the configuration file.
-	Name     string   // Name is the name of the configuration file.
-	Target   any      // Target is the target of the configuration.
+	Provider Provider // Provider is the provider of the configuration, e.g., file, etc.
+	Path     []string // Path is the path to the configuration file, can be multiple paths.
+	Name     string   // Name is the name of the configuration file without extension.
+	Dest     any      // Dest is the destination where the configuration will be unmarshalled.
 }
 
-type ConfigOption func(*Config)
+type ConfigOption func(*Option)
 
-func WithLogger(log log.Helper) ConfigOption {
-	return func(c *Config) {
-		c.log = log
+func WithProvider(provider Provider) ConfigOption {
+	return func(o *Option) {
+		o.Provider = provider
 	}
 }
 
-func New(option Option, opts ...ConfigOption) *Config {
+func WithPath(path ...string) ConfigOption {
+	return func(o *Option) {
+		o.Path = path
+	}
+}
+
+func WithName(name string) ConfigOption {
+	return func(o *Option) {
+		o.Name = name
+	}
+}
+
+func WithDest(dest any) ConfigOption {
+	return func(o *Option) {
+		o.Dest = dest
+	}
+}
+
+func New(opts ...ConfigOption) *Config {
 	c := &Config{
-		Option: option,
-		log:    log.DefaultLogger,
-	}
-
-	if err := c.init(); err != nil {
-		c.log.Fatal(err)
+		Option: Option{
+			Provider: ProviderFile,
+			Path:     []string{"."},
+		},
+		viper: viper.New(),
 	}
 
 	for _, opt := range opts {
-		opt(c)
+		opt(&c.Option)
 	}
 
-	c.setDefault()
+	if err := c.init(); err != nil {
+		log.Error().Err(err).Send()
+		return nil
+	}
+
+	c.configureViper()
 
 	return c
 }
 
 func (c *Config) init() error {
-	return reflect.SetDefaultTag(c.Option.Target)
+	return reflect.SetDefaultTag(c.Option.Dest)
 }
 
-func (c *Config) setDefault() {
-	if c.Option.Path == nil {
-		c.Option.Path = []string{"."}
-	}
+// configureViper configures the default settings for the viper instance
+func (c *Config) configureViper() {
+	// Parse configuration file type
 	extension := path.Ext(c.Option.Name)
 	configType := strings.TrimPrefix(extension, ".")
 
-	for _, path := range c.Option.Path {
-		viper.AddConfigPath(path)
+	// Configure viper
+	for _, configPath := range c.Option.Path {
+		c.viper.AddConfigPath(configPath)
 	}
-	viper.SetConfigName(c.Option.Name)
-	viper.SetConfigType(configType)
-	viper.AutomaticEnv()
-	replacer := strings.NewReplacer(".", "_")
-	viper.SetEnvKeyReplacer(replacer)
+
+	c.viper.SetConfigName(c.Option.Name)
+	c.viper.SetConfigType(configType)
+	c.viper.AutomaticEnv()
+	c.viper.SetEnvKeyReplacer(envKeyReplacer)
 }
 
 func (c *Config) GetViper() *viper.Viper {
-	return viper.GetViper()
+	return c.viper
 }
 
 func (c *Config) ReadInConfig() error {
-	if err := viper.ReadInConfig(); err != nil {
+	if err := c.viper.ReadInConfig(); err != nil {
 		return err
 	}
 
-	if err := viper.Unmarshal(&c.Option.Target); err != nil {
+	if err := c.viper.Unmarshal(&c.Option.Dest); err != nil {
 		return err
 	}
 
@@ -94,20 +119,12 @@ func (c *Config) ReadInConfig() error {
 }
 
 func (c *Config) WatchConfig() error {
-	ch := make(chan error, 1)
-
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		c.log.Infof("config file changed: %s", e.Name)
+	c.viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Info().Msgf("config file changed: %s", e.Name)
 		if err := c.ReadInConfig(); err != nil {
-			ch <- err
+			log.Error().Err(err).Msg("failed to reload config")
 		}
 	})
-	viper.WatchConfig()
-
-	select {
-	case err := <-ch:
-		return err
-	default:
-		return nil
-	}
+	c.viper.WatchConfig()
+	return nil
 }

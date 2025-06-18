@@ -1,97 +1,100 @@
 package log
 
 import (
-	"fmt"
 	"os"
-	"sync"
 
-	"github.com/kochabonline/kit/log/level"
-	"github.com/kochabonline/kit/log/zerolog"
+	"github.com/rs/zerolog"
 )
 
 var (
-	global = new(glogger)
+	global *Logger
 )
 
-type glogger struct {
-	mu sync.Mutex
-	Logger
-}
-
 func init() {
-	global.setLogger(zerolog.New())
+	global = New()
 }
 
-func (g *glogger) setLogger(logger Logger) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.Logger = logger
+// SetLogger 设置全局logger
+func SetLogger(logger *Logger) {
+	global = logger
 }
 
-func SetLogger(logger Logger) {
-	global.setLogger(logger)
+// Debug 全局debug日志
+func Debug() *zerolog.Event {
+	return global.Debug()
 }
 
-func Debug(args ...any) {
-	global.Log(level.Debug, defaultMsgKey, fmt.Sprint(args...))
+// Info 全局info日志
+func Info() *zerolog.Event {
+	return global.Info()
+}
+
+// Warn 全局warn日志
+func Warn() *zerolog.Event {
+	return global.Warn()
+}
+
+// Error 全局error日志
+func Error() *zerolog.Event {
+	return global.Error().Stack()
+}
+
+// Fatal 全局fatal日志
+func Fatal() *zerolog.Event {
+	return global.Fatal().Stack()
+}
+
+// Panic 全局panic日志
+func Panic() *zerolog.Event {
+	return global.Panic().Stack()
 }
 
 func Debugf(format string, args ...any) {
-	global.Log(level.Debug, defaultMsgKey, fmt.Sprintf(format, args...))
-}
-
-func Debugw(keyvals ...any) {
-	global.Log(level.Debug, keyvals...)
-}
-
-func Info(args ...any) {
-	global.Log(level.Info, defaultMsgKey, fmt.Sprint(args...))
+	global.Debug().Msgf(format, args...)
 }
 
 func Infof(format string, args ...any) {
-	global.Log(level.Info, defaultMsgKey, fmt.Sprintf(format, args...))
-}
-
-func Infow(keyvals ...any) {
-	global.Log(level.Info, keyvals...)
-}
-
-func Warn(args ...any) {
-	global.Log(level.Warn, defaultMsgKey, fmt.Sprint(args...))
+	global.Info().Msgf(format, args...)
 }
 
 func Warnf(format string, args ...any) {
-	global.Log(level.Warn, defaultMsgKey, fmt.Sprintf(format, args...))
-}
-
-func Warnw(keyvals ...any) {
-	global.Log(level.Warn, keyvals...)
-}
-
-func Error(args ...any) {
-	global.Log(level.Error, defaultMsgKey, fmt.Sprint(args...))
+	global.Warn().Msgf(format, args...)
 }
 
 func Errorf(format string, args ...any) {
-	global.Log(level.Error, defaultMsgKey, fmt.Sprintf(format, args...))
-}
-
-func Errorw(keyvals ...any) {
-	global.Log(level.Error, keyvals...)
-}
-
-func Fatal(args ...any) {
-	global.Log(level.Fatal, defaultMsgKey, fmt.Sprint(args...))
-	os.Exit(1)
+	global.Error().Stack().Msgf(format, args...)
 }
 
 func Fatalf(format string, args ...any) {
-	global.Log(level.Fatal, defaultMsgKey, fmt.Sprintf(format, args...))
+	global.Fatal().Stack().Msgf(format, args...)
 	os.Exit(1)
 }
 
-func Fatalw(keyvals ...any) {
-	global.Log(level.Fatal, keyvals...)
+func Panicf(format string, args ...any) {
+	global.Panic().Stack().Msgf(format, args...)
+}
+
+func Debugs(msg string) {
+	global.Debug().Msg(msg)
+}
+
+func Infos(msg string) {
+	global.Info().Msg(msg)
+}
+
+func Warns(msg string) {
+	global.Warn().Msg(msg)
+}
+
+func Errors(msg string) {
+	global.Error().Stack().Msg(msg)
+}
+
+func Fatals(msg string) {
+	global.Fatal().Stack().Msg(msg)
 	os.Exit(1)
+}
+
+func Panics(msg string) {
+	global.Panic().Stack().Msg(msg)
 }

@@ -4,61 +4,120 @@ import (
 	"reflect"
 )
 
-type MapConfig struct {
-	tag       string
-	skipEmpty bool
+// MapOption configuration options for struct to map conversion
+type MapOption struct {
+	tag       string // tag used to get field names
+	skipEmpty bool   // whether to skip zero value fields
 }
 
-func WithMapTag(tag string) func(*MapConfig) {
-	return func(c *MapConfig) {
-		c.tag = tag
+// WithMapTag sets the tag used to get field names
+func WithMapTag(tag string) func(*MapOption) {
+	return func(opt *MapOption) {
+		opt.tag = tag
 	}
 }
 
-func WithMapSkipEmpty() func(*MapConfig) {
-	return func(c *MapConfig) {
-		c.skipEmpty = true
+// WithMapSkipEmpty sets to skip zero value fields
+func WithMapSkipEmpty() func(*MapOption) {
+	return func(opt *MapOption) {
+		opt.skipEmpty = true
 	}
 }
 
-func StructConvMap(target any, opts ...func(*MapConfig)) (map[string]any, error) {
-	config := &MapConfig{
+// StructConvMap converts struct to map[string]any
+// Supports recursive conversion of nested structs
+func StructConvMap(target any, opts ...func(*MapOption)) (map[string]any, error) {
+	// Initialize configuration, default to use json tag
+	option := &MapOption{
 		tag: "json",
 	}
+
+	// Apply option configurations
 	for _, opt := range opts {
-		opt(config)
+		opt(option)
 	}
 
+	return structToMap(target, option)
+}
+
+// structToMap performs the actual struct to map conversion
+func structToMap(target any, config *MapOption) (map[string]any, error) {
+	// Get reflection object of the value
 	valueOf := reflect.ValueOf(target)
+
+	// Handle pointer type
 	if valueOf.Kind() == reflect.Ptr {
+		if valueOf.IsNil() {
+			return nil, nil
+		}
 		valueOf = valueOf.Elem()
 	}
+
+	// Ensure it's a struct type
+	if valueOf.Kind() != reflect.Struct {
+		return nil, nil
+	}
+
 	typeOf := valueOf.Type()
+	numField := typeOf.NumField()
 
-	result := make(map[string]any, typeOf.NumField())
-	for i := range typeOf.NumField() {
+	// Pre-allocate map capacity to improve performance
+	result := make(map[string]any, numField)
+
+	// Iterate through struct fields
+	for i := 0; i < numField; i++ {
 		field := typeOf.Field(i)
-		tag := field.Tag.Get(config.tag)
-		if tag == "" {
-			tag = field.Name
-		}
+		fieldValue := valueOf.Field(i)
 
-		value := valueOf.Field(i)
-		if value.IsZero() && config.skipEmpty {
+		// Skip inaccessible fields
+		if !fieldValue.CanInterface() {
 			continue
 		}
 
-		switch value.Kind() {
-		case reflect.Struct:
-			m, err := StructConvMap(value.Interface())
-			if err != nil {
-				return nil, err
-			}
-			result[tag] = m
-		default:
-			result[tag] = value.Interface()
+		// Get field name, prioritize using tag
+		fieldName := getFieldName(field, config.tag)
+
+		// If configured to skip zero values and current field is zero value, skip it
+		if config.skipEmpty && fieldValue.IsZero() {
+			continue
 		}
+
+		// Process field value
+		value, err := processFieldValue(fieldValue, config)
+		if err != nil {
+			return nil, err
+		}
+
+		result[fieldName] = value
 	}
 
 	return result, nil
+}
+
+// getFieldName gets field name, prioritize using specified tag
+func getFieldName(field reflect.StructField, tag string) string {
+	if tagValue := field.Tag.Get(tag); tagValue != "" {
+		return tagValue
+	}
+	return field.Name
+}
+
+// processFieldValue processes field value, supports nested structs
+func processFieldValue(fieldValue reflect.Value, config *MapOption) (any, error) {
+	switch fieldValue.Kind() {
+	case reflect.Struct:
+		// Recursively process nested structs
+		return structToMap(fieldValue.Interface(), config)
+	case reflect.Ptr:
+		// Handle pointer type
+		if fieldValue.IsNil() {
+			return nil, nil
+		}
+		if fieldValue.Elem().Kind() == reflect.Struct {
+			return structToMap(fieldValue.Interface(), config)
+		}
+		return fieldValue.Interface(), nil
+	default:
+		return fieldValue.Interface(), nil
+	}
 }

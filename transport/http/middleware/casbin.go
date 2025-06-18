@@ -24,19 +24,19 @@ func CasbinWithConfig(config CasbinConfig) gin.HandlerFunc {
 		act := c.Request.Method
 		accountId, sub, err := ctxAccountInfo(c)
 		if err != nil {
-			mlog.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", err.Error())
+			mlog.Error().Err(err).Int64("accountId", accountId).Strs("roles", sub).Str("path", obj).Str("method", act).Msg("get account info from context")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 
 		ok, err := config.E.Enforce(sub, obj, act)
 		if err != nil {
-			mlog.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", err.Error())
+			mlog.Error().Err(err).Int64("accountId", accountId).Strs("roles", sub).Str("path", obj).Str("method", act).Msg("casbin enforce error")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 		if !ok {
-			mlog.Errorw("accountId", accountId, "role", sub, "path", obj, "method", act, "error", "casbin denied access")
+			mlog.Error().Int64("accountId", accountId).Strs("roles", sub).Str("path", obj).Str("method", act).Msg("casbin denied access")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}

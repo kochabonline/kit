@@ -26,7 +26,6 @@ type App struct {
 	sigs            []os.Signal
 	closeFuncs      []func()
 	shutdownTimeout time.Duration
-	log             log.Helper
 }
 
 type Option func(*App)
@@ -61,12 +60,6 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithLogger(log log.Helper) Option {
-	return func(a *App) {
-		a.log = log
-	}
-}
-
 func New(servers []transport.Server, opts ...Option) *App {
 	app := &App{
 		ctx:             context.Background(),
@@ -74,7 +67,6 @@ func New(servers []transport.Server, opts ...Option) *App {
 		sigs:            []os.Signal{os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT},
 		shutdownTimeout: 30 * time.Second,
 		closeFuncs:      make([]func(), 0),
-		log:             log.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -115,7 +107,7 @@ func (a *App) Run() error {
 	eg.Go(func() error {
 		select {
 		case signal := <-ch:
-			a.log.Infof("received signal %s, shutting down", signal)
+			log.Info().Msgf("received signal %s, shutting down", signal)
 			a.close()
 			return context.Canceled
 		case <-ctx.Done():

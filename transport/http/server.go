@@ -30,13 +30,13 @@ type Meta struct {
 type Server struct {
 	Meta
 	server  *http.Server
-	log     log.Helper
+	log     *log.Logger
 	options Options
 }
 
 type Option func(*Server)
 
-func WithLogger(log log.Helper) Option {
+func WithLogger(log *log.Logger) Option {
 	return func(s *Server) {
 		s.log = log
 	}
@@ -44,9 +44,8 @@ func WithLogger(log log.Helper) Option {
 
 func WithMetricsOptions(metrics MetricsOption) Option {
 	return func(s *Server) {
-		err := metrics.init()
-		if err != nil {
-			s.log.Errorf("failed to init metrics: %v", err)
+		if err := metrics.init(); err != nil {
+			s.log.Error().Err(err).Send()
 			return
 		}
 		s.options.Metrics = metrics
@@ -55,9 +54,8 @@ func WithMetricsOptions(metrics MetricsOption) Option {
 
 func WithSwagOptions(swag SwagOption) Option {
 	return func(s *Server) {
-		err := swag.init()
-		if err != nil {
-			s.log.Errorf("failed to init swag: %v", err)
+		if err := swag.init(); err != nil {
+			s.log.Error().Err(err).Send()
 			return
 		}
 		s.options.Swag = swag
@@ -66,9 +64,8 @@ func WithSwagOptions(swag SwagOption) Option {
 
 func WithHealthOptions(health HealthOption) Option {
 	return func(s *Server) {
-		err := health.init()
-		if err != nil {
-			s.log.Errorf("failed to init health: %v", err)
+		if err := health.init(); err != nil {
+			s.log.Error().Err(err).Send()
 			return
 		}
 		s.options.Health = health
@@ -107,10 +104,10 @@ func (s *Server) Run() error {
 	}
 
 	if ok := transport.ValidateAddress(s.server.Addr); !ok {
-		s.log.Warnf("invalid address %s, using default address: %s", s.server.Addr, defaultAddr)
+		s.log.Warn().Msgf("invalid address %s, using default address: %s", s.server.Addr, defaultAddr)
 		s.server.Addr = defaultAddr
 	}
-	s.log.Infof("%s server listening on %s", s.Name, s.server.Addr)
+	s.log.Info().Msgf("%s server listening on %s", s.Name, s.server.Addr)
 
 	return s.server.ListenAndServe()
 }

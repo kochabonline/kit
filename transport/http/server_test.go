@@ -32,7 +32,7 @@ func TestServerRun(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	time.Sleep(30 * time.Second) // give server time to start
+	time.Sleep(10 * time.Second) // give server time to start
 
 	resp, err := http.Get("http://localhost:8080")
 	assert.NoError(t, err)

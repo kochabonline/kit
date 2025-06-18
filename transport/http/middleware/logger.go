@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"bytes"
-	"io"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,46 +29,42 @@ func GinLoggerWithConfig(config LoggerConfig) gin.HandlerFunc {
 			config.Option.Filter(c)
 		}
 
-		// Pre-allocate slices to avoid dynamic expansion
-		params := make([]any, 0, 10)
-		// Reading the request body must be done before c.Next(), otherwise the body will be cleared
+		start := time.Now()
+		c.Next()
+		duration := time.Since(start)
+
+		event := mlog.Info().
+			Str("method", c.Request.Method).
+			Str("uri", c.Request.RequestURI).
+			Dur("duration", duration).
+			Int("status", c.Writer.Status()).
+			Str("client_ip", c.ClientIP())
+
 		if config.BodyEnabled {
-			// After reading, write it back to the request body
 			body, err := c.GetRawData()
 			if err != nil {
-				params = append(params, "error", err.Error())
+				event = event.Str("error", err.Error())
 			} else {
-				c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
-				params = append(params, "body", string(body))
+				event = event.Str("body", string(body))
 			}
 		}
 
-		start := time.Now()
-		c.Next()
-		cost := time.Since(start)
-
-		params = append(params,
-			"method", c.Request.Method,
-			"uri", c.Request.RequestURI,
-			"cost", cost.String(),
-			"status", c.Writer.Status(),
-			"client_ip", c.ClientIP(),
-		)
-
 		if requestId := c.Request.Header.Get("X-Request-Id"); requestId != "" {
-			params = append(params, "request_id", requestId)
+			event = event.Str("request_id", requestId)
 		}
+
 		if config.HeaderEnabled {
-			params = append(params, "headers", c.Request.Header)
+			event = event.Any("headers", c.Request.Header)
 		}
+
 		if config.HandlerEnabled {
-			params = append(params, "handler", c.HandlerName())
+			event = event.Str("handler", c.HandlerName())
 		}
 
 		if len(c.Errors) > 0 {
-			params = append(params, "errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
+			event = event.Any("errors", c.Errors.ByType(gin.ErrorTypePrivate).String())
 		}
 
-		mlog.Infow(params...)
+		event.Send()
 	}
 }

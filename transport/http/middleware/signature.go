@@ -26,7 +26,7 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		// Get the signature from the header
 		header := c.GetHeader("Signature")
 		if header == "" {
-			mlog.Errorw("message", "signature", "error", "missing signature")
+			mlog.Error().Msg("signature header is missing")
 			response.GinJSONError(c, ErrorSignature)
 			return
 		}
@@ -56,7 +56,7 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		if config.EnableBody {
 			body, err := c.GetRawData()
 			if err != nil {
-				mlog.Errorw("message", "signature get raw data", "error", err.Error())
+				mlog.Error().Err(err).Msg("signature get raw data")
 				response.GinJSONError(c, ErrorSignature)
 				return
 			}
@@ -77,7 +77,7 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		// Compute the signature
 		signature := computeHMACSHA256(config.Secret, toCompute.String())
 		if signature != header {
-			mlog.Errorw("message", "signature", "error", "verify signature failed")
+			mlog.Error().Msg("verify signature failed")
 			response.GinJSONError(c, ErrorSignature)
 			return
 		}

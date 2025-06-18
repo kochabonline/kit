@@ -5,7 +5,6 @@ import (
 	"github.com/kochabonline/kit/core/util"
 	"github.com/kochabonline/kit/errors"
 	"github.com/kochabonline/kit/log"
-	"github.com/kochabonline/kit/log/zerolog"
 )
 
 var (
@@ -16,11 +15,11 @@ var (
 )
 
 var (
-	mlog = log.NewHelper(zerolog.New())
+	mlog = log.New()
 )
 
-func SetLogger(logger log.Logger) {
-	mlog = log.NewHelper(logger)
+func SetLogger(logger *log.Logger) {
+	mlog = logger
 }
 
 func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {

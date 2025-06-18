@@ -37,7 +37,7 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_, accountRoles, err := ctxAccountInfo(c)
 		if err != nil {
-			mlog.Errorw("error", err.Error())
+			mlog.Error().Err(err).Msg("get account info from context")
 			response.GinJSONError(c, ErrorUnauthorized)
 			return
 		}
@@ -50,23 +50,18 @@ func PermissionHPEWithConfig(config PermissionHPEConfig) gin.HandlerFunc {
 		ctx := c.Request.Context()
 		Operator, err := util.CtxValue[string](ctx, config.OperatorKey)
 		if err != nil {
-			mlog.Errorw("message", "operator key not found", "key", config.OperatorKey, "error", err.Error())
+			mlog.Error().Err(err).Str("key", config.OperatorKey).Msg("operator key not found")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 		Owner, err := util.CtxValue[[]string](ctx, config.OwnerKey)
 		if err != nil {
-			mlog.Errorw("message", "owner key not found", "key", config.OwnerKey, "error", err.Error())
+			mlog.Error().Err(err).Str("key", config.OwnerKey).Msg("owner key not found")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
 		if !slice.Contains(Operator, Owner) {
-			mlog.Errorw(
-				"message", "operator is not owner",
-				"operator", Operator,
-				"owner", Owner, "error",
-				errors.Forbidden("operator %s is not allowed to access", Operator),
-			)
+			mlog.Error().Str("message", "operator is not owner").Str("operator", Operator).Strs("owner", Owner).Err(errors.Forbidden("operator %s is not allowed to access", Operator)).Msg("")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
@@ -89,19 +84,13 @@ func PermissionVPEWithConfig(config PermissionVPEConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		accountId, accountRoles, err := ctxAccountInfo(c)
 		if err != nil {
-			mlog.Errorw("error", err.Error())
+			mlog.Error().Err(err).Msg("get account info from context")
 			response.GinJSONError(c, ErrorUnauthorized)
 			return
 		}
 
 		if !slice.ContainsSlice(config.AllowedRoles, accountRoles) {
-			mlog.Errorw(
-				"id", accountId,
-				"roles", accountRoles,
-				"url", c.Request.URL.Path,
-				"method", c.Request.Method,
-				"error", errors.Forbidden("roles %s is not allowed to access", strings.Join(accountRoles, ",")),
-			)
+			mlog.Error().Int64("id", accountId).Strs("roles", accountRoles).Str("url", c.Request.URL.Path).Str("method", c.Request.Method).Err(errors.Forbidden("roles %s is not allowed to access", strings.Join(accountRoles, ","))).Msg("")
 			response.GinJSONError(c, ErrorForbidden)
 			return
 		}
