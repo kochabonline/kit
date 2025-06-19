@@ -33,8 +33,6 @@ func TestGlobalLog(t *testing.T) {
 	Warn().Msg("test global warn log")
 	Warn().Err(errors.New(404, "test warn error")).Msg("test global warn error log")
 	Error().Err(errors.New(500, "test global error")).Msg("test global error log")
-	Fatal().Msg("test global fatal log")
-	Panic().Msg("test global panic log")
 }
 
 func TestFileLog(t *testing.T) {

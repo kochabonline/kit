@@ -14,8 +14,8 @@ func init() {
 	global = New()
 }
 
-// SetLogger 设置全局logger
-func SetLogger(logger *Logger) {
+// SetGlobalLogger 设置全局日志记录器
+func SetGlobalLogger(logger *Logger) {
 	global = logger
 }
 

@@ -15,9 +15,8 @@ import (
 	"github.com/kochabonline/kit/transport"
 )
 
-var (
-	closeFuncs      = make([]func(), 0)
-	closeFuncsMutex sync.Mutex
+const (
+	defaultShutdownTimeout = 30 * time.Second
 )
 
 type App struct {
@@ -63,11 +62,13 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 func New(servers []transport.Server, opts ...Option) *App {
 	app := &App{
 		ctx:             context.Background(),
-		servers:         servers,
+		servers:         make([]transport.Server, len(servers)),
 		sigs:            []os.Signal{os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT},
-		shutdownTimeout: 30 * time.Second,
+		shutdownTimeout: defaultShutdownTimeout,
 		closeFuncs:      make([]func(), 0),
 	}
+
+	copy(app.servers, servers)
 
 	for _, opt := range opts {
 		opt(app)
@@ -107,7 +108,7 @@ func (a *App) Run() error {
 	eg.Go(func() error {
 		select {
 		case signal := <-ch:
-			log.Info().Msgf("received signal %s, shutting down", signal)
+			log.Info().Str("signal", signal.String()).Msg("received shutdown signal")
 			a.close()
 			return context.Canceled
 		case <-ctx.Done():
@@ -126,20 +127,11 @@ func (a *App) Run() error {
 // Close closes the app.
 func (a *App) close() {
 	wg := sync.WaitGroup{}
-	closeFuncs := append(closeFuncs, a.closeFuncs...)
-	wg.Add(len(closeFuncs))
-	for _, close := range closeFuncs {
+	for _, close := range a.closeFuncs {
 		go func(fn func()) {
 			defer wg.Done()
 			fn()
 		}(close)
 	}
 	wg.Wait()
-}
-
-// AddCloseFuncs adds close functions to the global close functions.
-func AddCloseFuncs(f ...func()) {
-	closeFuncsMutex.Lock()
-	defer closeFuncsMutex.Unlock()
-	closeFuncs = append(closeFuncs, f...)
 }

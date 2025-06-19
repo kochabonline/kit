@@ -30,22 +30,15 @@ type Meta struct {
 type Server struct {
 	Meta
 	server  *http.Server
-	log     *log.Logger
 	options Options
 }
 
 type Option func(*Server)
 
-func WithLogger(log *log.Logger) Option {
-	return func(s *Server) {
-		s.log = log
-	}
-}
-
 func WithMetricsOptions(metrics MetricsOption) Option {
 	return func(s *Server) {
 		if err := metrics.init(); err != nil {
-			s.log.Error().Err(err).Send()
+			log.Error().Err(err).Send()
 			return
 		}
 		s.options.Metrics = metrics
@@ -55,7 +48,7 @@ func WithMetricsOptions(metrics MetricsOption) Option {
 func WithSwagOptions(swag SwagOption) Option {
 	return func(s *Server) {
 		if err := swag.init(); err != nil {
-			s.log.Error().Err(err).Send()
+			log.Error().Err(err).Send()
 			return
 		}
 		s.options.Swag = swag
@@ -65,7 +58,7 @@ func WithSwagOptions(swag SwagOption) Option {
 func WithHealthOptions(health HealthOption) Option {
 	return func(s *Server) {
 		if err := health.init(); err != nil {
-			s.log.Error().Err(err).Send()
+			log.Error().Err(err).Send()
 			return
 		}
 		s.options.Health = health
@@ -78,7 +71,6 @@ func NewServer(addr string, handler http.Handler, opts ...Option) *Server {
 			Addr:    addr,
 			Handler: handler,
 		},
-		log: log.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -104,10 +96,10 @@ func (s *Server) Run() error {
 	}
 
 	if ok := transport.ValidateAddress(s.server.Addr); !ok {
-		s.log.Warn().Msgf("invalid address %s, using default address: %s", s.server.Addr, defaultAddr)
+		log.Warn().Msgf("invalid address %s, using default address: %s", s.server.Addr, defaultAddr)
 		s.server.Addr = defaultAddr
 	}
-	s.log.Info().Msgf("%s server listening on %s", s.Name, s.server.Addr)
+	log.Info().Msgf("%s server listening on %s", s.Name, s.server.Addr)
 
 	return s.server.ListenAndServe()
 }
