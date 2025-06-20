@@ -17,9 +17,18 @@ type mock struct {
 }
 
 func init() {
-	Validate.RegisterValidation("adultAge", adultAge)
-	Validate.RegisterTranslation("adultAge", TransZh, registrationZhFunc, translateFunc)
-	Validate.RegisterTranslation("adultAge", TransEn, registrationEnFunc, translateFunc)
+	transEn, err := GetTranslator(LanguageEN)
+	if err != nil {
+		panic(err)
+	}
+	transZh, err := GetTranslator(LanguageZH)
+	if err != nil {
+		panic(err)
+	}
+
+	GetValidate().RegisterValidation("adultAge", adultAge)
+	GetValidate().RegisterTranslation("adultAge", transZh, registrationZhFunc, translateFunc)
+	GetValidate().RegisterTranslation("adultAge", transEn, registrationEnFunc, translateFunc)
 }
 
 func adultAge(fl validator.FieldLevel) bool {

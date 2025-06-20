@@ -15,95 +15,155 @@ import (
 	"github.com/kochabonline/kit/log"
 )
 
-var (
-	Validate *validator.Validate
-	TransEn  ut.Translator
-	TransZh  ut.Translator
+const (
+	LanguageEN         = "en"
+	LanguageZH         = "zh"
+	ErrorSeparator     = "; "
+	TranslationTag     = "label"
+	TranslationJSONTag = "json"
 )
 
-func init() {
-	initValidator()
+var (
+	ErrTranslatorNotFound = errors.New("translator not found")
+)
+
+var (
+	defaultValidator *Validator
+)
+
+type Validator struct {
+	validate *validator.Validate
+	trans    map[string]ut.Translator
 }
 
-// initValidator initializes the validator and translator.
-func initValidator() {
-	Validate = validator.New()
+type Option func(*Validator)
 
-	// Create the English and Chinese translators.
+// NewValidator 创建一个具有默认设置的新验证器实例。
+func NewValidator(opts ...Option) *Validator {
+	validator := &Validator{
+		validate: validator.New(),
+		trans:    make(map[string]ut.Translator),
+	}
+
+	for _, opt := range opts {
+		opt(validator)
+	}
+
+	validator.initialize()
+
+	return validator
+}
+
+func (v *Validator) initialize() {
+	// 创建英文和中文翻译器。
 	enTranslator := en.New()
 	zhTranslator := zh.New()
 
 	uni := ut.New(enTranslator, zhTranslator)
 
-	// Register the English and Chinese translators.
-	TransEn, _ = uni.GetTranslator("en")
-	TransZh, _ = uni.GetTranslator("zh")
+	// 注册英文和中文翻译器。
+	transEn, _ := uni.GetTranslator(LanguageEN)
+	transZh, _ := uni.GetTranslator(LanguageZH)
 
-	// Register the default translations for the English translator.
-	if err := enTrans.RegisterDefaultTranslations(Validate, TransEn); err != nil {
-		log.Errorf("authenticator registration translator error: %v", err)
+	v.trans = map[string]ut.Translator{
+		LanguageEN: transEn,
+		LanguageZH: transZh,
 	}
 
-	// Register the default translations for the Chinese translator.
-	if err := zhTrans.RegisterDefaultTranslations(Validate, TransZh); err != nil {
-		log.Errorf("authenticator registration translator error: %v", err)
+	// 将翻译器存储在验证器实例中。
+	if err := enTrans.RegisterDefaultTranslations(v.validate, transEn); err != nil {
+		log.Error().Err(err).Msg("failed to register English translations")
+	}
+	if err := zhTrans.RegisterDefaultTranslations(v.validate, transZh); err != nil {
+		log.Error().Err(err).Msg("failed to register Chinese translations")
 	}
 
-	// Register the tag name function.
-	Validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
-		if name == "-" {
-			name = ""
+	v.validate.RegisterTagNameFunc(v.getFieldName)
+}
+
+// getFieldName 从结构体标签中提取字段名称
+func (v *Validator) getFieldName(fld reflect.StructField) string {
+	// 首先尝试从 label 标签获取
+	if label := fld.Tag.Get(TranslationTag); label != "" {
+		return label
+	}
+
+	// 然后尝试从 json 标签获取
+	if jsonTag := fld.Tag.Get(TranslationJSONTag); jsonTag != "" {
+		name := strings.SplitN(jsonTag, ",", 2)[0]
+		if name != "-" && name != "" {
+			return name
 		}
-		label := fld.Tag.Get("label")
-		if label != "" {
-			name = label
-		}
+	}
 
-		return name
-	})
+	// 回退到字段名称
+	return fld.Name
 }
 
-func RegisterValidation(tag string, fn validator.Func) error {
-	return Validate.RegisterValidation(tag, fn)
+func (v *Validator) GetValidate() *validator.Validate {
+	return v.validate
 }
 
-func RegisterTranslation(tag string, trans ut.Translator, registerFn validator.RegisterTranslationsFunc, translationFn validator.TranslationFunc) error {
-	return Validate.RegisterTranslation(tag, trans, registerFn, translationFn)
+func (v *Validator) GetTranslator(language string) (ut.Translator, error) {
+	if language == "" {
+		language = LanguageEN
+	}
+
+	trans, found := v.trans[language]
+	if !found {
+		return nil, ErrTranslatorNotFound
+	}
+	return trans, nil
 }
 
-// Struct validates the given struct using the validator and the default translator.
-func Struct(target any) error {
-	return StructTrans(target, "zh")
-}
+func (v *Validator) StructTrans(target any, language string) error {
+	var trans ut.Translator
+	var err error
 
-// StructTrans validates the given struct using the validator and translator.
-func StructTrans(target any, language string) error {
-	err := Validate.Struct(target)
+	if trans, err = v.GetTranslator(language); err != nil {
+		return err
+	}
+
+	err = v.validate.Struct(target)
 	if err != nil {
 		var invalidValidationError *validator.InvalidValidationError
 		if errors.As(err, &invalidValidationError) {
 			return err
 		}
 
-		var trans ut.Translator
-		if strings.HasPrefix(language, "zh") {
-			trans = TransZh
-		} else if strings.HasPrefix(language, "en") {
-			trans = TransEn
-		} else {
-			trans = TransEn
-		}
-
-		// Translate the validation errors.
+		// 翻译验证错误信息。
 		sb := strings.Builder{}
 		for _, e := range err.(validator.ValidationErrors) {
 			if sb.Len() > 0 {
-				sb.WriteString("; ")
+				sb.WriteString(ErrorSeparator)
 			}
 			sb.WriteString(e.Translate(trans))
 		}
 		return errors.New(sb.String())
 	}
 	return nil
+}
+
+func (v *Validator) Struct(target any) error {
+	return v.StructTrans(target, LanguageZH)
+}
+
+func init() {
+	defaultValidator = NewValidator()
+}
+
+func GetValidate() *validator.Validate {
+	return defaultValidator.GetValidate()
+}
+
+func GetTranslator(language string) (ut.Translator, error) {
+	return defaultValidator.GetTranslator(language)
+}
+
+func Struct(target any) error {
+	return defaultValidator.Struct(target)
+}
+
+func StructTrans(target any, language string) error {
+	return defaultValidator.StructTrans(target, language)
 }

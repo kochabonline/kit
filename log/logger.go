@@ -56,6 +56,13 @@ type Logger struct {
 
 type Option func(*Logger)
 
+// WithCaller 设置调用栈信息
+func WithCaller() Option {
+	return func(l *Logger) {
+		l.Logger = l.Logger.With().Caller().Logger()
+	}
+}
+
 // WithCallerSkip 设置调用栈跳过的帧数
 func WithCallerSkip(skip int) Option {
 	return func(l *Logger) {
@@ -103,14 +110,14 @@ func newFallbackWriter(config Config) io.Writer {
 
 func newBaseLogger(writer io.Writer) *Logger {
 	return &Logger{
-		Logger: zerolog.New(writer).With().Timestamp().Caller().Logger(),
+		Logger: zerolog.New(writer).With().Timestamp().Logger(),
 	}
 }
 
-func (l *Logger) applyDesensitizeHook(writer io.Writer, opts ...Option) {
+func (l *Logger) handlerDesensitizeHook(writer io.Writer, opts ...Option) {
 	if l.desensitizeHook != nil {
 		w := NewDesensitizeWriter(writer, l.desensitizeHook)
-		l.Logger = zerolog.New(w).With().Timestamp().Caller().Logger()
+		l.Logger = zerolog.New(w).With().Timestamp().Logger()
 	}
 
 	// 重建 logger 后，重新应用所有选项
@@ -127,7 +134,7 @@ func New(opts ...Option) *Logger {
 		opt(logger)
 	}
 
-	logger.applyDesensitizeHook(os.Stdout, opts...)
+	logger.handlerDesensitizeHook(os.Stdout, opts...)
 
 	return logger
 }
@@ -141,7 +148,7 @@ func NewFile(c Config, opts ...Option) *Logger {
 		opt(logger)
 	}
 
-	logger.applyDesensitizeHook(writer, opts...)
+	logger.handlerDesensitizeHook(writer, opts...)
 
 	return logger
 }
@@ -156,7 +163,7 @@ func NewMulti(c Config, opts ...Option) *Logger {
 		opt(logger)
 	}
 
-	logger.applyDesensitizeHook(multi, opts...)
+	logger.handlerDesensitizeHook(multi, opts...)
 
 	return logger
 }
@@ -199,16 +206,16 @@ func consoleWriter() zerolog.ConsoleWriter {
 func rotateWriter(config Config) (io.Writer, error) {
 	switch config.RotateMode {
 	case RotateModeTime:
-		return newTimeRotateWriter(config)
+		return timeRotateWriter(config)
 	case RotateModeSize:
-		return newSizeRotateWriter(config)
+		return sizeRotateWriter(config)
 	default:
 		return nil, fmt.Errorf("unsupported rotate mode: %d", config.RotateMode)
 	}
 }
 
-// newTimeRotateWriter 按时间轮转的writer
-func newTimeRotateWriter(config Config) (io.Writer, error) {
+// timeRotateWriter 按时间轮转的writer
+func timeRotateWriter(config Config) (io.Writer, error) {
 	writer, err := rotatelogs.New(
 		config.fileFullPathWithFormat("%Y%m%d%H%M"),
 		rotatelogs.WithLinkName(config.fileFullPath()),
@@ -221,8 +228,8 @@ func newTimeRotateWriter(config Config) (io.Writer, error) {
 	return writer, nil
 }
 
-// newSizeRotateWriter 按大小轮转的writer
-func newSizeRotateWriter(config Config) (io.Writer, error) {
+// sizeRotateWriter 按大小轮转的writer
+func sizeRotateWriter(config Config) (io.Writer, error) {
 	return &lumberjack.Logger{
 		Filename:   config.fileFullPath(),
 		MaxSize:    config.LumberjackConfig.MaxSize,

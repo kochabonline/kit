@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport"
@@ -17,7 +17,6 @@ import (
 var _ transport.Server = (*Server)(nil)
 
 const (
-	// DefaultAddr is the default address for the server.
 	defaultName = "http"
 	defaultAddr = ":8080"
 )
@@ -28,9 +27,9 @@ type Meta struct {
 }
 
 type Server struct {
-	Meta
-	server  *http.Server
+	meta    Meta
 	options Options
+	server  *http.Server
 }
 
 type Option func(*Server)
@@ -77,12 +76,7 @@ func NewServer(addr string, handler http.Handler, opts ...Option) *Server {
 		opt(s)
 	}
 
-	// addon handlers
-	if r, ok := s.server.Handler.(*gin.Engine); ok {
-		handleMetrics(s, r)
-		handleSwag(s, r)
-		handleHealth(s, r)
-	}
+	additionalHandlers(s)
 
 	return s
 }
@@ -91,15 +85,15 @@ func (s *Server) Run() error {
 	if s.server == nil {
 		return http.ErrServerClosed
 	}
-	if s.Name == "" {
-		s.Name = defaultName
+	if s.meta.Name == "" {
+		s.meta.Name = defaultName
 	}
 
 	if ok := transport.ValidateAddress(s.server.Addr); !ok {
 		log.Warn().Msgf("invalid address %s, using default address: %s", s.server.Addr, defaultAddr)
 		s.server.Addr = defaultAddr
 	}
-	log.Info().Msgf("%s server listening on %s", s.Name, s.server.Addr)
+	log.Info().Msgf("%s server listening on %s", s.meta.Name, s.server.Addr)
 
 	return s.server.ListenAndServe()
 }
@@ -110,6 +104,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	return s.server.Shutdown(ctx)
+}
+
+func additionalHandlers(s *Server) {
+	if r, ok := s.server.Handler.(*gin.Engine); ok {
+		handleMetrics(s, r)
+		handleSwag(s, r)
+		handleHealth(s, r)
+	}
 }
 
 func handleMetrics(s *Server, r *gin.Engine) {

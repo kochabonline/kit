@@ -20,22 +20,14 @@ const (
 type Server struct {
 	addr   string
 	server *grpc.Server
-	log    *log.Logger
 }
 
 type Option func(*Server)
-
-func WithLogger(log *log.Logger) Option {
-	return func(s *Server) {
-		s.log = log
-	}
-}
 
 func NewServer(addr string, opts ...Option) *Server {
 	s := &Server{
 		addr:   addr,
 		server: grpc.NewServer(),
-		log:    log.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -51,7 +43,7 @@ func (s *Server) Run() error {
 	}
 
 	if ok := transport.ValidateAddress(s.addr); !ok {
-		s.log.Warn().Msgf("invalid address %s, using default address: %s", s.addr, defaultAddr)
+		log.Warn().Msgf("invalid address %s, using default address: %s", s.addr, defaultAddr)
 		s.addr = defaultAddr
 	}
 
@@ -59,7 +51,7 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	s.log.Info().Msgf("grpc server listening on %s", s.addr)
+	log.Info().Msgf("grpc server listening on %s", s.addr)
 
 	return s.server.Serve(listen)
 }
