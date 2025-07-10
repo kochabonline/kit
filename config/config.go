@@ -21,54 +21,48 @@ const (
 var envKeyReplacer = strings.NewReplacer(".", "_")
 
 type Config struct {
-	Option Option `json:"option"`
-	viper  *viper.Viper
-}
-
-type Option struct {
+	viper    *viper.Viper
 	Provider Provider // Provider is the provider of the configuration, e.g., file, etc.
 	Path     []string // Path is the path to the configuration file, can be multiple paths.
 	Name     string   // Name is the name of the configuration file without extension.
 	Dest     any      // Dest is the destination where the configuration will be unmarshalled.
 }
 
-type ConfigOption func(*Option)
+type Option func(*Config)
 
-func WithProvider(provider Provider) ConfigOption {
-	return func(o *Option) {
-		o.Provider = provider
+func WithProvider(provider Provider) Option {
+	return func(c *Config) {
+		c.Provider = provider
 	}
 }
 
-func WithPath(path ...string) ConfigOption {
-	return func(o *Option) {
-		o.Path = path
+func WithPath(path ...string) Option {
+	return func(c *Config) {
+		c.Path = path
 	}
 }
 
-func WithName(name string) ConfigOption {
-	return func(o *Option) {
-		o.Name = name
+func WithName(name string) Option {
+	return func(c *Config) {
+		c.Name = name
 	}
 }
 
-func WithDest(dest any) ConfigOption {
-	return func(o *Option) {
-		o.Dest = dest
+func WithDest(dest any) Option {
+	return func(c *Config) {
+		c.Dest = dest
 	}
 }
 
-func New(opts ...ConfigOption) *Config {
+func New(opts ...Option) *Config {
 	c := &Config{
-		Option: Option{
-			Provider: ProviderFile,
-			Path:     []string{"."},
-		},
-		viper: viper.New(),
+		Provider: ProviderFile,
+		Path:     []string{"."},
+		viper:    viper.New(),
 	}
 
 	for _, opt := range opts {
-		opt(&c.Option)
+		opt(c)
 	}
 
 	if err := c.init(); err != nil {
@@ -82,21 +76,21 @@ func New(opts ...ConfigOption) *Config {
 }
 
 func (c *Config) init() error {
-	return reflect.SetDefaultTag(c.Option.Dest)
+	return reflect.SetDefaultTag(c.Dest)
 }
 
 // configureViper configures the default settings for the viper instance
 func (c *Config) configureViper() {
 	// Parse configuration file type
-	extension := path.Ext(c.Option.Name)
+	extension := path.Ext(c.Name)
 	configType := strings.TrimPrefix(extension, ".")
 
 	// Configure viper
-	for _, configPath := range c.Option.Path {
+	for _, configPath := range c.Path {
 		c.viper.AddConfigPath(configPath)
 	}
 
-	c.viper.SetConfigName(c.Option.Name)
+	c.viper.SetConfigName(c.Name)
 	c.viper.SetConfigType(configType)
 	c.viper.AutomaticEnv()
 	c.viper.SetEnvKeyReplacer(envKeyReplacer)
@@ -111,7 +105,7 @@ func (c *Config) ReadInConfig() error {
 		return err
 	}
 
-	if err := c.viper.Unmarshal(&c.Option.Dest); err != nil {
+	if err := c.viper.Unmarshal(&c.Dest); err != nil {
 		return err
 	}
 

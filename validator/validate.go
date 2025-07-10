@@ -38,7 +38,7 @@ type Validator struct {
 
 type Option func(*Validator)
 
-// NewValidator 创建一个具有默认设置的新验证器实例。
+// NewValidator 创建一个具有默认设置的新验证器实例
 func NewValidator(opts ...Option) *Validator {
 	validator := &Validator{
 		validate: validator.New(),
@@ -55,13 +55,13 @@ func NewValidator(opts ...Option) *Validator {
 }
 
 func (v *Validator) initialize() {
-	// 创建英文和中文翻译器。
+	// 创建英文和中文翻译器
 	enTranslator := en.New()
 	zhTranslator := zh.New()
 
 	uni := ut.New(enTranslator, zhTranslator)
 
-	// 注册英文和中文翻译器。
+	// 注册英文和中文翻译器
 	transEn, _ := uni.GetTranslator(LanguageEN)
 	transZh, _ := uni.GetTranslator(LanguageZH)
 
@@ -70,7 +70,7 @@ func (v *Validator) initialize() {
 		LanguageZH: transZh,
 	}
 
-	// 将翻译器存储在验证器实例中。
+	// 注册验证器的翻译
 	if err := enTrans.RegisterDefaultTranslations(v.validate, transEn); err != nil {
 		log.Error().Err(err).Msg("failed to register English translations")
 	}
@@ -131,7 +131,7 @@ func (v *Validator) StructTrans(target any, language string) error {
 			return err
 		}
 
-		// 翻译验证错误信息。
+		// 翻译验证错误信息
 		sb := strings.Builder{}
 		for _, e := range err.(validator.ValidationErrors) {
 			if sb.Len() > 0 {
