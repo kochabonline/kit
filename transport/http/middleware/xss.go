@@ -45,7 +45,7 @@ func XssWithConfig(config XssConfig) gin.HandlerFunc {
 		if c.Request.Header.Get("Content-Type") == "application/json" {
 			bodyBytes, err := io.ReadAll(c.Request.Body)
 			if err == nil {
-				var bodyMap map[string]interface{}
+				var bodyMap map[string]any
 				if err := json.Unmarshal(bodyBytes, &bodyMap); err == nil {
 					for key, value := range bodyMap {
 						if strValue, ok := value.(string); ok {
