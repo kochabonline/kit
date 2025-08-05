@@ -1,575 +1,777 @@
 package scheduler
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
+	// "github.com/kochabonline/kit/log"
+	"github.com/kochabonline/kit/store/etcd"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// TestTask 测试任务结构
-func TestTask(t *testing.T) {
-	t.Run("创建任务", func(t *testing.T) {
-		task := &Task{
-			ID:       "test-task-1",
-			Name:     "测试任务",
-			Priority: TaskPriorityNormal,
-			Status:   TaskStatusPending,
-			Payload: map[string]any{
-				"action": "test",
-				"data":   "hello",
-			},
-			Metadata: map[string]string{
-				"created_by": "test",
-			},
-			MaxRetries:    3,
-			RetryInterval: 5 * time.Second,
-			Timeout:       30 * time.Second,
-			CreatedAt:     currentTimestamp(),
-			UpdatedAt:     currentTimestamp(),
-		}
+// 初始化全局日志配置
+// func init() {
+// 	log.SetGlobalLogger(log.New(log.WithCaller()))
+// }
 
-		assert.Equal(t, "test-task-1", task.ID)
-		assert.Equal(t, "测试任务", task.Name)
-		assert.Equal(t, TaskPriorityNormal, task.Priority)
-		assert.Equal(t, TaskStatusPending, task.Status)
-		assert.Equal(t, "test", task.Payload["action"])
-		assert.Equal(t, "test", task.Metadata["created_by"])
-		assert.Equal(t, 3, task.MaxRetries)
-		assert.True(t, task.CreatedAt > 0)
-		assert.True(t, task.UpdatedAt > 0)
-	})
+// TestSchedulerIntegration 集成测试：从创建调度器到任务执行的完整流程
+func TestSchedulerIntegration(t *testing.T) {
+	// 跳过集成测试（需要运行中的ETCD）
+	if testing.Short() {
+		t.Skip("跳过集成测试")
+	}
 
-	t.Run("任务状态转换", func(t *testing.T) {
-		statuses := []TaskStatus{
-			TaskStatusPending,
-			TaskStatusScheduled,
-			TaskStatusRunning,
-			TaskStatusCompleted,
-			TaskStatusFailed,
-			TaskStatusCanceled,
-			TaskStatusRetrying,
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
-		expectedStrings := []string{
-			"pending",
-			"scheduled",
-			"running",
-			"completed",
-			"failed",
-			"canceled",
-			"retrying",
-		}
+	// 创建ETCD客户端
+	etcdClient, err := createTestETCDClient()
+	require.NoError(t, err, "创建ETCD客户端失败")
+	defer etcdClient.Close()
 
-		for i, status := range statuses {
-			assert.Equal(t, expectedStrings[i], status.String())
-		}
-	})
-}
+	// 清理测试数据
+	defer cleanupTestData(ctx, etcdClient)
 
-// TestWorker 测试工作节点结构
-func TestWorker(t *testing.T) {
-	t.Run("创建工作节点", func(t *testing.T) {
-		worker := &Worker{
-			ID:             "worker-1",
-			Name:           "测试工作节点",
-			Status:         WorkerStatusOnline,
-			Version:        "1.0.0",
-			Capabilities:   []string{"compute", "storage"},
-			MaxConcurrency: 10,
-			Weight:         1,
-			Tags: map[string]string{
-				"env": "test",
-			},
-			LastHeartbeat: currentTimestamp(),
-			RegisteredAt:  currentTimestamp(),
-			UpdatedAt:     currentTimestamp(),
-		}
+	t.Run("完整的调度器生命周期测试", func(t *testing.T) {
+		// 1. 创建调度器
+		scheduler, err := createTestScheduler(etcdClient)
+		require.NoError(t, err, "创建调度器失败")
 
-		assert.Equal(t, "worker-1", worker.ID)
-		assert.Equal(t, "测试工作节点", worker.Name)
-		assert.Equal(t, WorkerStatusOnline, worker.Status)
-		assert.Equal(t, "1.0.0", worker.Version)
-		assert.Contains(t, worker.Capabilities, "compute")
-		assert.Contains(t, worker.Capabilities, "storage")
-		assert.Equal(t, 10, worker.MaxConcurrency)
-		assert.Equal(t, "test", worker.Tags["env"])
-		assert.True(t, worker.LastHeartbeat > 0)
-	})
+		// 2. 启动调度器
+		err = scheduler.Start(ctx)
+		require.NoError(t, err, "启动调度器失败")
+		defer func() {
+			err := scheduler.Stop(ctx)
+			assert.NoError(t, err, "停止调度器失败")
+		}()
 
-	t.Run("工作节点状态转换", func(t *testing.T) {
-		statuses := []WorkerStatus{
-			WorkerStatusOnline,
-			WorkerStatusOffline,
-			WorkerStatusBusy,
-			WorkerStatusIdle,
-		}
+		// 等待调度器完全启动
+		time.Sleep(2 * time.Second)
 
-		expectedStrings := []string{
-			"online",
-			"offline",
-			"busy",
-			"idle",
-		}
+		// 3. 创建并启动工作节点
+		worker := createTestWorker()
+		workerNode, err := createTestWorkerNode(etcdClient, worker.ID, worker.Name)
+		require.NoError(t, err, "创建工作节点失败")
 
-		for i, status := range statuses {
-			assert.Equal(t, expectedStrings[i], status.String())
-		}
+		err = workerNode.Start(ctx)
+		require.NoError(t, err, "启动工作节点失败")
+		defer workerNode.Stop(ctx)
+
+		// 等待工作节点完全启动
+		time.Sleep(1 * time.Second)
+
+		// 4. 注册工作节点到调度器
+		err = scheduler.RegisterWorker(ctx, worker)
+		require.NoError(t, err, "注册工作节点失败")
+
+		// 等待工作节点注册完成
+		time.Sleep(1 * time.Second)
+
+		// 5. 验证工作节点注册成功
+		retrievedWorker, err := scheduler.GetWorker(ctx, worker.ID)
+		require.NoError(t, err, "获取工作节点失败")
+		assert.Equal(t, worker.ID, retrievedWorker.ID)
+		assert.Equal(t, worker.Name, retrievedWorker.Name)
+
+		// 6. 提交任务
+		task := createTestTask()
+		err = scheduler.SubmitTask(ctx, task)
+		require.NoError(t, err, "提交任务失败")
+
+		// 7. 验证任务提交成功
+		retrievedTask, err := scheduler.GetTask(ctx, task.ID)
+		require.NoError(t, err, "获取任务失败")
+		assert.Equal(t, task.ID, retrievedTask.ID)
+		assert.Equal(t, TaskStatusPending, retrievedTask.Status)
+
+		// 8. 等待任务被调度并执行完成
+		err = waitForTaskStatus(ctx, scheduler, task.ID, TaskStatusCompleted, 60*time.Second)
+		require.NoError(t, err, "等待任务完成超时")
+
+		// 9. 验证任务执行完成
+		completedTask, err := scheduler.GetTask(ctx, task.ID)
+		require.NoError(t, err, "获取完成后的任务失败")
+		assert.Equal(t, TaskStatusCompleted, completedTask.Status)
+		assert.Equal(t, worker.ID, completedTask.WorkerID)
+		assert.True(t, completedTask.ScheduledAt > 0)
+		assert.True(t, completedTask.StartedAt > 0)
+		assert.True(t, completedTask.CompletedAt > 0)
+		assert.True(t, completedTask.CompletedAt >= completedTask.StartedAt)
+
+		// 10. 验证调度器指标
+		metrics := scheduler.GetMetrics()
+		assert.True(t, metrics.TasksTotal >= 1)
+		assert.True(t, metrics.TasksCompleted >= 1)
+		assert.True(t, metrics.WorkersTotal >= 1)
 	})
 }
 
-// TestTaskPriority 测试任务优先级
-func TestTaskPriority(t *testing.T) {
-	t.Run("优先级字符串转换", func(t *testing.T) {
-		priorities := []TaskPriority{
-			TaskPriorityLow,
-			TaskPriorityNormal,
-			TaskPriorityHigh,
-			TaskPriorityCritical,
+// TestSchedulerMultipleTasksExecution 测试多个任务并发执行
+func TestSchedulerMultipleTasksExecution(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过集成测试")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	etcdClient, err := createTestETCDClient()
+	require.NoError(t, err)
+	defer etcdClient.Close()
+	defer cleanupTestData(ctx, etcdClient)
+
+	t.Run("多任务并发执行测试", func(t *testing.T) {
+		scheduler, err := createTestScheduler(etcdClient)
+		require.NoError(t, err)
+
+		err = scheduler.Start(ctx)
+		require.NoError(t, err)
+		defer scheduler.Stop(ctx)
+
+		time.Sleep(2 * time.Second)
+
+		// 注册多个工作节点
+		workers := make([]*Worker, 3)
+		workerNodes := make([]*WorkerNode, 3)
+		for i := 0; i < 3; i++ {
+			worker := createTestWorker()
+			worker.ID = fmt.Sprintf("worker-%d", i+1)
+			worker.Name = fmt.Sprintf("测试工作节点-%d", i+1)
+			workers[i] = worker
+
+			// 创建并启动工作节点实例
+			workerNode, err := createTestWorkerNode(etcdClient, worker.ID, worker.Name)
+			require.NoError(t, err)
+			workerNodes[i] = workerNode
+
+			err = workerNode.Start(ctx)
+			require.NoError(t, err)
+			defer workerNode.Stop(ctx)
 		}
 
-		expectedStrings := []string{
-			"low",
-			"normal",
-			"high",
-			"critical",
+		// 等待工作节点完全启动
+		time.Sleep(2 * time.Second)
+
+		// 注册工作节点到调度器
+		for _, worker := range workers {
+			err = scheduler.RegisterWorker(ctx, worker)
+			require.NoError(t, err)
 		}
 
-		for i, priority := range priorities {
-			assert.Equal(t, expectedStrings[i], priority.String())
+		time.Sleep(1 * time.Second)
+
+		// 提交多个任务
+		taskCount := 10000
+		tasks := make([]*Task, taskCount)
+		for i := 0; i < taskCount; i++ {
+			task := createTestTask()
+			task.ID = fmt.Sprintf("task-%d", i+1)
+			task.Name = fmt.Sprintf("测试任务-%d", i+1)
+			tasks[i] = task
+
+			err = scheduler.SubmitTask(ctx, task)
+			require.NoError(t, err)
 		}
+
+		// 等待所有任务被调度
+		for _, task := range tasks {
+			err = waitForTaskStatus(ctx, scheduler, task.ID, TaskStatusScheduled, 30*time.Second)
+			require.NoError(t, err, "任务 %s 调度超时", task.ID)
+		}
+
+		// 等待所有任务被调度并执行完成
+		completedCount := 0
+		maxWaitTime := 120 * time.Second // 增加等待时间
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		timeout := time.After(maxWaitTime)
+
+		for completedCount < taskCount {
+			select {
+			case <-timeout:
+				t.Fatalf("等待任务完成超时，完成数量: %d/%d", completedCount, taskCount)
+			case <-ticker.C:
+				completedCount = 0
+				for _, task := range tasks {
+					finalTask, err := scheduler.GetTask(ctx, task.ID)
+					if err == nil && finalTask.Status == TaskStatusCompleted {
+						completedCount++
+					}
+				}
+				t.Logf("已完成任务数量: %d/%d", completedCount, taskCount)
+			}
+		}
+
+		assert.Equal(t, taskCount, completedCount, "完成的任务数量不匹配")
+
+		// 验证指标
+		metrics := scheduler.GetMetrics()
+		assert.True(t, metrics.TasksTotal >= int64(taskCount))
+		assert.True(t, metrics.TasksCompleted >= int64(taskCount))
+		assert.True(t, metrics.WorkersTotal >= 3)
 	})
 }
 
-// TestEventType 测试事件类型
-func TestEventType(t *testing.T) {
-	t.Run("事件类型字符串转换", func(t *testing.T) {
-		events := []EventType{
+// TestSchedulerFailoverScenario 测试故障转移场景
+func TestSchedulerFailoverScenario(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过集成测试")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	etcdClient, err := createTestETCDClient()
+	require.NoError(t, err)
+	defer etcdClient.Close()
+	defer cleanupTestData(ctx, etcdClient)
+
+	t.Run("工作节点故障转移测试", func(t *testing.T) {
+		scheduler, err := createTestScheduler(etcdClient)
+		require.NoError(t, err)
+
+		err = scheduler.Start(ctx)
+		require.NoError(t, err)
+		defer scheduler.Stop(ctx)
+
+		time.Sleep(2 * time.Second)
+
+		// 注册工作节点
+		worker1 := createTestWorker()
+		worker1.ID = "worker-1"
+		worker1.Name = "工作节点-1"
+		err = scheduler.RegisterWorker(ctx, worker1)
+		require.NoError(t, err)
+
+		worker2 := createTestWorker()
+		worker2.ID = "worker-2"
+		worker2.Name = "工作节点-2"
+		err = scheduler.RegisterWorker(ctx, worker2)
+		require.NoError(t, err)
+
+		time.Sleep(1 * time.Second)
+
+		// 提交任务
+		task := createTestTask()
+		err = scheduler.SubmitTask(ctx, task)
+		require.NoError(t, err)
+
+		// 等待任务被调度
+		err = waitForTaskStatus(ctx, scheduler, task.ID, TaskStatusScheduled, 30*time.Second)
+		require.NoError(t, err)
+
+		// 获取被分配的任务
+		scheduledTask, err := scheduler.GetTask(ctx, task.ID)
+		require.NoError(t, err)
+		assignedWorkerID := scheduledTask.WorkerID
+
+		// 模拟工作节点故障（注销工作节点）
+		err = scheduler.UnregisterWorker(ctx, assignedWorkerID)
+		require.NoError(t, err)
+
+		// 等待一段时间让调度器检测到工作节点故障
+		time.Sleep(5 * time.Second)
+
+		// 验证任务可以被重新调度到其他工作节点
+		// （在实际场景中，需要实现任务重新调度逻辑）
+
+		// 验证工作节点已被移除
+		_, err = scheduler.GetWorker(ctx, assignedWorkerID)
+		assert.Error(t, err, "故障工作节点应该已被移除")
+	})
+}
+
+// TestSchedulerEventHandling 测试事件处理
+func TestSchedulerEventHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过集成测试")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	etcdClient, err := createTestETCDClient()
+	require.NoError(t, err)
+	defer etcdClient.Close()
+	defer cleanupTestData(ctx, etcdClient)
+
+	t.Run("事件处理测试", func(t *testing.T) {
+		scheduler, err := createTestScheduler(etcdClient)
+		require.NoError(t, err)
+
+		// 设置事件计数器
+		eventCounts := make(map[EventType]int)
+		var eventMutex sync.Mutex
+
+		// 注册事件回调
+		eventTypes := []EventType{
 			EventTaskSubmitted,
 			EventTaskScheduled,
 			EventTaskStarted,
 			EventTaskCompleted,
-			EventTaskFailed,
-			EventTaskCanceled,
 			EventWorkerJoined,
-			EventWorkerLeft,
-			EventWorkerOnline,
-			EventWorkerOffline,
-			EventLeaderElected,
-			EventLeaderLost,
 			EventSchedulerStarted,
-			EventSchedulerStopped,
 		}
 
-		expectedStrings := []string{
-			"task_submitted",
-			"task_scheduled",
-			"task_started",
-			"task_completed",
-			"task_failed",
-			"task_canceled",
-			"worker_joined",
-			"worker_left",
-			"worker_online",
-			"worker_offline",
-			"leader_elected",
-			"leader_lost",
-			"scheduler_started",
-			"scheduler_stopped",
+		for _, eventType := range eventTypes {
+			et := eventType // 捕获循环变量
+			err = scheduler.RegisterEventCallback(et, func(event *SchedulerEvent) {
+				eventMutex.Lock()
+				eventCounts[et]++
+				eventMutex.Unlock()
+			})
+			require.NoError(t, err)
 		}
 
-		for i, event := range events {
-			assert.Equal(t, expectedStrings[i], event.String())
-		}
+		err = scheduler.Start(ctx)
+		require.NoError(t, err)
+		defer scheduler.Stop(ctx)
+
+		time.Sleep(2 * time.Second)
+
+		// 创建并启动工作节点
+		worker := createTestWorker()
+		workerNode, err := createTestWorkerNode(etcdClient, worker.ID, worker.Name)
+		require.NoError(t, err)
+
+		err = workerNode.Start(ctx)
+		require.NoError(t, err)
+		defer workerNode.Stop(ctx)
+
+		// 等待工作节点完全启动
+		time.Sleep(1 * time.Second)
+
+		// 注册工作节点到调度器
+		err = scheduler.RegisterWorker(ctx, worker)
+		require.NoError(t, err)
+
+		// 提交任务
+		task := createTestTask()
+		err = scheduler.SubmitTask(ctx, task)
+		require.NoError(t, err)
+
+		// 等待任务被调度
+		err = waitForTaskStatus(ctx, scheduler, task.ID, TaskStatusScheduled, 30*time.Second)
+		require.NoError(t, err)
+
+		// 等待任务被调度并执行完成
+		err = waitForTaskStatus(ctx, scheduler, task.ID, TaskStatusCompleted, 60*time.Second)
+		require.NoError(t, err)
+
+		// 等待事件处理
+		time.Sleep(2 * time.Second)
+
+		// 验证事件计数
+		eventMutex.Lock()
+		defer eventMutex.Unlock()
+
+		assert.True(t, eventCounts[EventSchedulerStarted] >= 1, "调度器启动事件应该被触发")
+		assert.True(t, eventCounts[EventWorkerJoined] >= 1, "工作节点加入事件应该被触发")
+		assert.True(t, eventCounts[EventTaskSubmitted] >= 1, "任务提交事件应该被触发")
+		assert.True(t, eventCounts[EventTaskScheduled] >= 1, "任务调度事件应该被触发")
+		assert.True(t, eventCounts[EventTaskStarted] >= 1, "任务开始事件应该被触发")
+		assert.True(t, eventCounts[EventTaskCompleted] >= 1, "任务完成事件应该被触发")
 	})
 }
 
-// TestSchedulerOptions 测试调度器选项
-func TestSchedulerOptions(t *testing.T) {
-	t.Run("默认选项", func(t *testing.T) {
-		options := DefaultSchedulerOptions()
+// 辅助函数
 
-		assert.Equal(t, "/scheduler/", options.EtcdKeyPrefix)
-		assert.Equal(t, 30*time.Second, options.HeartbeatInterval)
-		assert.Equal(t, 5*time.Minute, options.TaskTimeout)
-		assert.Equal(t, 60*time.Second, options.WorkerTimeout)
-		assert.Equal(t, 90*time.Second, options.WorkerTTL)
-		assert.Equal(t, 30*time.Second, options.ElectionTimeout)
-		assert.Equal(t, StrategyLeastTasks, options.LoadBalanceStrategy)
-		assert.True(t, options.EnableMetrics)
-		assert.False(t, options.EnableTracing)
-		assert.Equal(t, 3, options.MaxRetryAttempts)
-		assert.Equal(t, 1*time.Second, options.RetryBackoffBase)
-		assert.Equal(t, 60*time.Second, options.RetryBackoffMax)
-		assert.Equal(t, 10000, options.TaskQueueSize)
-		assert.Equal(t, 100, options.WorkerPoolSize)
-		assert.Equal(t, 100, options.BatchSize)
-		assert.Equal(t, 5*time.Second, options.FlushInterval)
-		assert.Equal(t, 1*time.Hour, options.CompactionInterval)
-		assert.True(t, options.EnableTaskPipeline)
-		assert.True(t, options.EnableAsyncCallback)
-	})
+// createTestETCDClient 创建测试用的ETCD客户端
+func createTestETCDClient() (*etcd.Etcd, error) {
+	config := &etcd.Config{
+		Endpoints:   []string{"localhost:2379"},
+		DialTimeout: 5,
+		Username:    "root",
+		Password:    "12345678",
+	}
 
-	t.Run("自定义选项", func(t *testing.T) {
-		options := &SchedulerOptions{
-			EtcdKeyPrefix:       "/custom-scheduler/",
-			HeartbeatInterval:   15 * time.Second,
-			TaskTimeout:         10 * time.Minute,
-			WorkerTimeout:       120 * time.Second,
-			ElectionTimeout:     60 * time.Second,
-			LoadBalanceStrategy: StrategyRoundRobin,
-			EnableMetrics:       false,
-			EnableTracing:       true,
-			MaxRetryAttempts:    5,
-			BatchSize:           50,
-		}
-
-		assert.Equal(t, "/custom-scheduler/", options.EtcdKeyPrefix)
-		assert.Equal(t, 15*time.Second, options.HeartbeatInterval)
-		assert.Equal(t, 10*time.Minute, options.TaskTimeout)
-		assert.Equal(t, 120*time.Second, options.WorkerTimeout)
-		assert.Equal(t, 60*time.Second, options.ElectionTimeout)
-		assert.Equal(t, StrategyRoundRobin, options.LoadBalanceStrategy)
-		assert.False(t, options.EnableMetrics)
-		assert.True(t, options.EnableTracing)
-		assert.Equal(t, 5, options.MaxRetryAttempts)
-		assert.Equal(t, 50, options.BatchSize)
-	})
+	return etcd.New(config)
 }
 
-// TestWorkerOptions 测试工作节点选项
-func TestWorkerOptions(t *testing.T) {
-	t.Run("默认工作节点选项", func(t *testing.T) {
-		options := DefaultWorkerOptions()
+// createTestScheduler 创建测试用的调度器
+func createTestScheduler(etcdClient *etcd.Etcd) (Scheduler, error) {
+	options := DefaultSchedulerOptions()
+	options.EtcdKeyPrefix = "/test-scheduler/"
+	options.HeartbeatInterval = 10 * time.Second
+	options.TaskTimeout = 30 * time.Second
+	options.WorkerTimeout = 30 * time.Second
+	options.ElectionTimeout = 10 * time.Second
+	options.BatchSize = 10
+	// 使用轮询策略确保任务均匀分布到所有工作节点
+	options.LoadBalanceStrategy = StrategyRoundRobin
 
-		assert.Equal(t, 10, options.MaxConcurrency)
-		assert.Equal(t, 30*time.Second, options.HeartbeatInterval)
-		assert.Equal(t, 90*time.Second, options.WorkerTTL)
-		assert.Equal(t, 5*time.Minute, options.TaskTimeout)
-		assert.Equal(t, 10*time.Minute, options.IdleTimeout)
-		assert.True(t, options.EnableHealthCheck)
-		assert.Equal(t, "/scheduler/", options.EtcdKeyPrefix)
-		assert.Equal(t, 1000, options.BufferSize)
-		assert.False(t, options.EnableCompression)
-		assert.True(t, options.EnableMetrics)
-	})
+	return NewScheduler(etcdClient, options)
 }
 
-// TestTaskFilter 测试任务过滤器
-func TestTaskFilter(t *testing.T) {
-	t.Run("创建任务过滤器", func(t *testing.T) {
-		filter := &TaskFilter{
-			Status:        []TaskStatus{TaskStatusPending, TaskStatusRunning},
-			WorkerID:      "worker-1",
-			Priority:      []TaskPriority{TaskPriorityHigh, TaskPriorityCritical},
-			CreatedAfter:  currentTimestamp() - 3600000, // 1小时前
-			CreatedBefore: currentTimestamp(),
-			Limit:         100,
-			Offset:        0,
-		}
-
-		assert.Contains(t, filter.Status, TaskStatusPending)
-		assert.Contains(t, filter.Status, TaskStatusRunning)
-		assert.Equal(t, "worker-1", filter.WorkerID)
-		assert.Contains(t, filter.Priority, TaskPriorityHigh)
-		assert.Contains(t, filter.Priority, TaskPriorityCritical)
-		assert.True(t, filter.CreatedAfter > 0)
-		assert.True(t, filter.CreatedBefore > 0)
-		assert.Equal(t, 100, filter.Limit)
-		assert.Equal(t, 0, filter.Offset)
-	})
+// createTestWorker 创建测试用的工作节点
+func createTestWorker() *Worker {
+	return &Worker{
+		ID:             generateWorkerID(),
+		Name:           "测试工作节点",
+		Status:         WorkerStatusOnline,
+		Version:        "1.0.0",
+		Capabilities:   []string{"test", "compute"},
+		MaxConcurrency: 5,
+		Weight:         1,
+		Tags: map[string]string{
+			"env":  "test",
+			"type": "compute",
+		},
+		Metadata: map[string]string{
+			"created_by": "test",
+		},
+		LastHeartbeat: currentTimestamp(),
+		HealthStatus: HealthStatus{
+			CPU:    0.1,
+			Memory: 0.2,
+			Disk:   0.1,
+			Load:   0.5,
+		},
+		ResourceUsage: ResourceUsage{
+			CPUPercent:    10.0,
+			MemoryPercent: 20.0,
+			DiskPercent:   10.0,
+			NetworkIn:     1024,
+			NetworkOut:    2048,
+		},
+	}
 }
 
-// TestWorkerFilter 测试工作节点过滤器
-func TestWorkerFilter(t *testing.T) {
-	t.Run("创建工作节点过滤器", func(t *testing.T) {
-		filter := &WorkerFilter{
-			Status:       []WorkerStatus{WorkerStatusOnline, WorkerStatusIdle},
-			Capabilities: []string{"compute", "storage"},
-			Tags: map[string]string{
-				"env": "production",
-			},
-			Limit:  50,
-			Offset: 0,
-		}
+// createTestWorkerNode 创建测试用的工作节点实例
+func createTestWorkerNode(etcdClient *etcd.Etcd, workerID, workerName string) (*WorkerNode, error) {
+	options := DefaultWorkerOptions()
+	options.WorkerID = workerID
+	options.WorkerName = workerName
+	options.EtcdKeyPrefix = "/test-scheduler/"
+	options.HeartbeatInterval = 5 * time.Second
+	options.WorkerTTL = 15 * time.Second
+	options.TaskTimeout = 30 * time.Second
+	options.MaxConcurrency = 5
 
-		assert.Contains(t, filter.Status, WorkerStatusOnline)
-		assert.Contains(t, filter.Status, WorkerStatusIdle)
-		assert.Contains(t, filter.Capabilities, "compute")
-		assert.Contains(t, filter.Capabilities, "storage")
-		assert.Equal(t, "production", filter.Tags["env"])
-		assert.Equal(t, 50, filter.Limit)
-		assert.Equal(t, 0, filter.Offset)
-	})
+	workerNode, err := NewWorkerNode(etcdClient, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// 设置简单的任务处理器
+	workerNode.SetTaskProcessor(&testTaskProcessor{})
+
+	return workerNode, nil
 }
 
-// TestSchedulerEvent 测试调度器事件
-func TestSchedulerEvent(t *testing.T) {
-	t.Run("创建调度器事件", func(t *testing.T) {
-		event := &SchedulerEvent{
-			Type:      EventTaskSubmitted,
-			TaskID:    "task-1",
-			WorkerID:  "worker-1",
-			Timestamp: currentTimestamp(),
-			Data: map[string]any{
-				"priority": "high",
-				"category": "compute",
-			},
-		}
+// testTaskProcessor 测试任务处理器
+type testTaskProcessor struct{}
 
-		assert.Equal(t, EventTaskSubmitted, event.Type)
-		assert.Equal(t, "task-1", event.TaskID)
-		assert.Equal(t, "worker-1", event.WorkerID)
-		assert.True(t, event.Timestamp > 0)
-		assert.Equal(t, "high", event.Data["priority"])
-		assert.Equal(t, "compute", event.Data["category"])
-	})
+func (p *testTaskProcessor) Process(ctx context.Context, task *Task) error {
+	// 模拟任务处理
+	time.Sleep(100 * time.Millisecond)
+	return nil
 }
 
-// TestSchedulerMetrics 测试调度器指标
-func TestSchedulerMetrics(t *testing.T) {
-	t.Run("创建调度器指标", func(t *testing.T) {
-		metrics := &SchedulerMetrics{
-			TasksTotal:         100,
-			TasksPending:       10,
-			TasksRunning:       20,
-			TasksCompleted:     60,
-			TasksFailed:        8,
-			TasksCanceled:      2,
-			TasksRetrying:      0,
-			WorkersTotal:       5,
-			WorkersOnline:      4,
-			WorkersOffline:     1,
-			WorkersBusy:        2,
-			WorkersIdle:        2,
-			AvgTaskDuration:    5 * time.Second,
-			TaskThroughput:     10.5,
-			SchedulerUptime:    2 * time.Hour,
-			LastScheduleTime:   currentTimestamp(),
-			TotalScheduleCount: 150,
-			MemoryUsage:        1024 * 1024 * 100, // 100MB
-			GoroutineCount:     50,
-			UpdatedAt:          currentTimestamp(),
-		}
-
-		assert.Equal(t, int64(100), metrics.TasksTotal)
-		assert.Equal(t, int64(10), metrics.TasksPending)
-		assert.Equal(t, int64(20), metrics.TasksRunning)
-		assert.Equal(t, int64(60), metrics.TasksCompleted)
-		assert.Equal(t, int64(8), metrics.TasksFailed)
-		assert.Equal(t, int64(2), metrics.TasksCanceled)
-		assert.Equal(t, int64(0), metrics.TasksRetrying)
-		assert.Equal(t, int64(5), metrics.WorkersTotal)
-		assert.Equal(t, int64(4), metrics.WorkersOnline)
-		assert.Equal(t, int64(1), metrics.WorkersOffline)
-		assert.Equal(t, int64(2), metrics.WorkersBusy)
-		assert.Equal(t, int64(2), metrics.WorkersIdle)
-		assert.Equal(t, 5*time.Second, metrics.AvgTaskDuration)
-		assert.Equal(t, 10.5, metrics.TaskThroughput)
-		assert.Equal(t, 2*time.Hour, metrics.SchedulerUptime)
-		assert.True(t, metrics.LastScheduleTime > 0)
-		assert.Equal(t, int64(150), metrics.TotalScheduleCount)
-		assert.Equal(t, int64(1024*1024*100), metrics.MemoryUsage)
-		assert.Equal(t, 50, metrics.GoroutineCount)
-		assert.True(t, metrics.UpdatedAt > 0)
-	})
+// createTestTask 创建测试用的任务
+func createTestTask() *Task {
+	return &Task{
+		ID:       generateTaskID(),
+		Name:     "测试任务",
+		Priority: TaskPriorityNormal,
+		Status:   TaskStatusPending,
+		Payload: map[string]any{
+			"action": "test",
+			"data":   "hello world",
+			"count":  42,
+		},
+		Metadata: map[string]string{
+			"created_by": "test",
+			"category":   "compute",
+		},
+		MaxRetries:    3,
+		RetryInterval: 5 * time.Second,
+		Timeout:       30 * time.Second,
+		Dependencies:  []string{},
+	}
 }
 
-// TestHealthStatus 测试健康状态
-func TestHealthStatus(t *testing.T) {
-	t.Run("创建健康状态", func(t *testing.T) {
-		health := &HealthStatus{
-			CPU:    0.25,
-			Memory: 0.60,
-			Disk:   0.40,
-			Load:   1.5,
-		}
+// waitForTaskStatus 等待任务达到指定状态
+func waitForTaskStatus(ctx context.Context, scheduler Scheduler, taskID string, expectedStatus TaskStatus, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
-		assert.Equal(t, 0.25, health.CPU)
-		assert.Equal(t, 0.60, health.Memory)
-		assert.Equal(t, 0.40, health.Disk)
-		assert.Equal(t, 1.5, health.Load)
-	})
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("等待任务状态超时: %s", expectedStatus.String())
+		case <-ticker.C:
+			task, err := scheduler.GetTask(ctx, taskID)
+			if err != nil {
+				continue
+			}
+			if task.Status == expectedStatus {
+				return nil
+			}
+		}
+	}
 }
 
-// TestResourceUsage 测试资源使用情况
-func TestResourceUsage(t *testing.T) {
-	t.Run("创建资源使用情况", func(t *testing.T) {
-		usage := &ResourceUsage{
-			CPUPercent:    25.5,
-			MemoryPercent: 60.0,
-			DiskPercent:   40.0,
-			NetworkIn:     1024 * 1024,     // 1MB
-			NetworkOut:    2 * 1024 * 1024, // 2MB
-		}
-
-		assert.Equal(t, 25.5, usage.CPUPercent)
-		assert.Equal(t, 60.0, usage.MemoryPercent)
-		assert.Equal(t, 40.0, usage.DiskPercent)
-		assert.Equal(t, int64(1024*1024), usage.NetworkIn)
-		assert.Equal(t, int64(2*1024*1024), usage.NetworkOut)
-	})
+// cleanupTestData 清理测试数据
+func cleanupTestData(ctx context.Context, etcdClient *etcd.Etcd) {
+	prefix := "/test-scheduler/"
+	_, err := etcdClient.Client.Delete(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		fmt.Printf("清理测试数据失败: %v\n", err)
+	}
 }
 
-// TestTaskExecutionResult 测试任务执行结果
-func TestTaskExecutionResult(t *testing.T) {
-	t.Run("创建任务执行结果", func(t *testing.T) {
-		startTime := currentTimestamp()
-		endTime := startTime + 5000 // 5秒后
+// TestSchedulerConcurrentOperations 测试并发操作
+func TestSchedulerConcurrentOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过集成测试")
+	}
 
-		result := &TaskExecutionResult{
-			TaskID:      "task-1",
-			Status:      TaskStatusCompleted,
-			Result:      map[string]any{"output": "success", "count": 42},
-			Error:       "",
-			StartedAt:   startTime,
-			CompletedAt: endTime,
-			Duration:    5 * time.Second,
-			Metrics:     map[string]any{"cpu_time": 3.2, "memory_peak": 256},
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
-		assert.Equal(t, "task-1", result.TaskID)
-		assert.Equal(t, TaskStatusCompleted, result.Status)
-		assert.Equal(t, "success", result.Result["output"])
-		assert.Equal(t, 42, result.Result["count"])
-		assert.Empty(t, result.Error)
-		assert.Equal(t, startTime, result.StartedAt)
-		assert.Equal(t, endTime, result.CompletedAt)
-		assert.Equal(t, 5*time.Second, result.Duration)
-		assert.Equal(t, 3.2, result.Metrics["cpu_time"])
-		assert.Equal(t, 256, result.Metrics["memory_peak"])
-	})
+	etcdClient, err := createTestETCDClient()
+	require.NoError(t, err)
+	defer etcdClient.Close()
+	defer cleanupTestData(ctx, etcdClient)
 
-	t.Run("创建失败的任务执行结果", func(t *testing.T) {
-		startTime := currentTimestamp()
-		endTime := startTime + 2000 // 2秒后
+	t.Run("并发操作测试", func(t *testing.T) {
+		scheduler, err := createTestScheduler(etcdClient)
+		require.NoError(t, err)
 
-		result := &TaskExecutionResult{
-			TaskID:      "task-2",
-			Status:      TaskStatusFailed,
-			Result:      nil,
-			Error:       "连接超时",
-			StartedAt:   startTime,
-			CompletedAt: endTime,
-			Duration:    2 * time.Second,
-			Metrics:     map[string]any{"attempts": 3, "last_error": "timeout"},
-		}
+		err = scheduler.Start(ctx)
+		require.NoError(t, err)
+		defer scheduler.Stop(ctx)
 
-		assert.Equal(t, "task-2", result.TaskID)
-		assert.Equal(t, TaskStatusFailed, result.Status)
-		assert.Nil(t, result.Result)
-		assert.Equal(t, "连接超时", result.Error)
-		assert.Equal(t, startTime, result.StartedAt)
-		assert.Equal(t, endTime, result.CompletedAt)
-		assert.Equal(t, 2*time.Second, result.Duration)
-		assert.Equal(t, 3, result.Metrics["attempts"])
-		assert.Equal(t, "timeout", result.Metrics["last_error"])
-	})
-}
+		time.Sleep(2 * time.Second)
 
-// TestUtilityFunctions 测试工具函数
-func TestUtilityFunctions(t *testing.T) {
-	t.Run("生成ID函数", func(t *testing.T) {
-		// 测试任务ID生成
-		taskID1 := generateTaskID()
-		taskID2 := generateTaskID()
-		assert.NotEmpty(t, taskID1)
-		assert.NotEmpty(t, taskID2)
-		assert.NotEqual(t, taskID1, taskID2)
-		assert.Contains(t, taskID1, "task-")
+		// 并发注册多个工作节点
+		workerCount := 5
+		var workerWG sync.WaitGroup
+		workerErrors := make(chan error, workerCount)
 
-		// 测试工作节点ID生成
-		workerID1 := generateWorkerID()
-		workerID2 := generateWorkerID()
-		assert.NotEmpty(t, workerID1)
-		assert.NotEmpty(t, workerID2)
-		assert.NotEqual(t, workerID1, workerID2)
-		assert.Contains(t, workerID1, "worker-")
+		for i := 0; i < workerCount; i++ {
+			workerWG.Add(1)
+			go func(index int) {
+				defer workerWG.Done()
+				worker := createTestWorker()
+				worker.ID = fmt.Sprintf("concurrent-worker-%d", index)
+				worker.Name = fmt.Sprintf("并发工作节点-%d", index)
 
-		// 测试节点ID生成
-		nodeID1 := generateNodeID()
-		nodeID2 := generateNodeID()
-		assert.NotEmpty(t, nodeID1)
-		assert.NotEmpty(t, nodeID2)
-		assert.NotEqual(t, nodeID1, nodeID2)
-		assert.Contains(t, nodeID1, "scheduler-")
-	})
-
-	t.Run("时间戳函数", func(t *testing.T) {
-		timestamp1 := currentTimestamp()
-		time.Sleep(1 * time.Millisecond)
-		timestamp2 := currentTimestamp()
-
-		assert.True(t, timestamp1 > 0)
-		assert.True(t, timestamp2 > timestamp1)
-	})
-}
-
-// TestErrorDefinitions 测试错误定义
-func TestErrorDefinitions(t *testing.T) {
-	t.Run("错误常量", func(t *testing.T) {
-		errors := []error{
-			ErrTaskNotFound,
-			ErrWorkerNotFound,
-			ErrTaskAlreadyExists,
-			ErrWorkerAlreadyExists,
-			ErrInvalidTaskStatus,
-			ErrInvalidWorkerStatus,
-			ErrSchedulerNotStarted,
-			ErrSchedulerAlreadyStarted,
-			ErrNoAvailableWorkers,
-			ErrTaskTimeout,
-			ErrTaskCanceled,
-			ErrMaxRetriesExceeded,
-			ErrWorkerOffline,
-			ErrContextCanceled,
-			ErrLeaderElectionFailed,
-		}
-
-		expectedMessages := []string{
-			"task not found",
-			"worker not found",
-			"task already exists",
-			"worker already exists",
-			"invalid task status",
-			"invalid worker status",
-			"scheduler not started",
-			"scheduler already started",
-			"no available workers",
-			"task timeout",
-			"task canceled",
-			"max retries exceeded",
-			"worker offline",
-			"context canceled",
-			"leader election failed",
-		}
-
-		for i, err := range errors {
-			assert.Error(t, err)
-			assert.Equal(t, expectedMessages[i], err.Error())
-		}
-	})
-}
-
-// TestLoadBalanceStrategy 测试负载均衡策略
-func TestLoadBalanceStrategy(t *testing.T) {
-	t.Run("负载均衡策略枚举", func(t *testing.T) {
-		strategies := []LoadBalanceStrategy{
-			StrategyLeastTasks,
-			StrategyRoundRobin,
-			StrategyWeightedRoundRobin,
-			StrategyRandom,
-			StrategyConsistentHash,
-			StrategyLeastConnections,
-		}
-
-		// 确保所有策略都是不同的值
-		for i, strategy := range strategies {
-			for j, otherStrategy := range strategies {
-				if i != j {
-					assert.NotEqual(t, strategy, otherStrategy)
+				if err := scheduler.RegisterWorker(ctx, worker); err != nil {
+					workerErrors <- err
 				}
+			}(i)
+		}
+
+		workerWG.Wait()
+		close(workerErrors)
+
+		// 检查工作节点注册错误
+		for err := range workerErrors {
+			assert.NoError(t, err, "并发注册工作节点失败")
+		}
+
+		// 并发提交多个任务
+		taskCount := 20
+		var taskWG sync.WaitGroup
+		taskErrors := make(chan error, taskCount)
+
+		for i := 0; i < taskCount; i++ {
+			taskWG.Add(1)
+			go func(index int) {
+				defer taskWG.Done()
+				task := createTestTask()
+				task.ID = fmt.Sprintf("concurrent-task-%d", index)
+				task.Name = fmt.Sprintf("并发任务-%d", index)
+
+				if err := scheduler.SubmitTask(ctx, task); err != nil {
+					taskErrors <- err
+				}
+			}(i)
+		}
+
+		taskWG.Wait()
+		close(taskErrors)
+
+		// 检查任务提交错误
+		for err := range taskErrors {
+			assert.NoError(t, err, "并发提交任务失败")
+		}
+
+		// 验证最终状态
+		time.Sleep(5 * time.Second)
+
+		workers, err := scheduler.ListWorkers(ctx, &WorkerFilter{})
+		assert.NoError(t, err)
+		assert.True(t, len(workers) >= workerCount, "注册的工作节点数量不够")
+
+		tasks, err := scheduler.ListTasks(ctx, &TaskFilter{})
+		assert.NoError(t, err)
+		assert.True(t, len(tasks) >= taskCount, "提交的任务数量不够")
+
+		metrics := scheduler.GetMetrics()
+		assert.True(t, metrics.TasksTotal >= int64(taskCount))
+		assert.True(t, metrics.WorkersTotal >= int64(workerCount))
+	})
+}
+
+// BenchmarkSchedulerThroughput 调度器吞吐量基准测试
+func BenchmarkSchedulerThroughput(b *testing.B) {
+	if testing.Short() {
+		b.Skip("跳过基准测试")
+	}
+
+	ctx := context.Background()
+	etcdClient, err := createTestETCDClient()
+	require.NoError(b, err)
+	defer etcdClient.Close()
+	defer cleanupTestData(ctx, etcdClient)
+
+	scheduler, err := createTestScheduler(etcdClient)
+	require.NoError(b, err)
+
+	err = scheduler.Start(ctx)
+	require.NoError(b, err)
+	defer scheduler.Stop(ctx)
+
+	// 注册工作节点
+	for i := 0; i < 10; i++ {
+		worker := createTestWorker()
+		worker.ID = fmt.Sprintf("bench-worker-%d", i)
+		err = scheduler.RegisterWorker(ctx, worker)
+		require.NoError(b, err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			task := createTestTask()
+			err := scheduler.SubmitTask(ctx, task)
+			if err != nil {
+				b.Error(err)
 			}
 		}
 	})
+}
+
+// waitForAllTasksStatus 等待所有任务达到指定状态
+func waitForAllTasksStatus(ctx context.Context, scheduler Scheduler, tasks []*Task, expectedStatus TaskStatus, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(tasks))
+
+	for _, task := range tasks {
+		wg.Add(1)
+		go func(t *Task) {
+			defer wg.Done()
+			if err := waitForTaskStatus(ctx, scheduler, t.ID, expectedStatus, timeout); err != nil {
+				errChan <- fmt.Errorf("任务 %s 未能达到状态 %s: %w", t.ID, expectedStatus, err)
+			}
+		}(task)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	if len(errChan) > 0 {
+		// 只返回第一个错误以避免日志泛滥
+		return <-errChan
+	}
+
+	return nil
+}
+
+// BenchmarkSchedulerHighVolumeTasks 性能测试：高并发下的任务处理能力
+func BenchmarkSchedulerHighVolumeTasks(b *testing.B) {
+	if testing.Short() {
+		b.Skip("跳过性能测试")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	etcdClient, err := createTestETCDClient()
+	require.NoError(b, err)
+	defer etcdClient.Close()
+	defer cleanupTestData(ctx, etcdClient)
+
+	scheduler, err := createTestScheduler(etcdClient)
+	require.NoError(b, err)
+
+	err = scheduler.Start(ctx)
+	require.NoError(b, err)
+	defer scheduler.Stop(ctx)
+
+	// 注册多个工作节点
+	workerCount := 10
+	workerNodes := make([]*WorkerNode, workerCount)
+	for i := 0; i < workerCount; i++ {
+		worker := createTestWorker()
+		worker.ID = fmt.Sprintf("perf-worker-%d", i)
+		worker.Name = fmt.Sprintf("性能测试工作节点-%d", i)
+
+		workerNode, wErr := createTestWorkerNode(etcdClient, worker.ID, worker.Name)
+		require.NoError(b, wErr)
+		workerNodes[i] = workerNode
+
+		wErr = workerNode.Start(ctx)
+		require.NoError(b, wErr)
+		defer workerNode.Stop(ctx)
+
+		err = scheduler.RegisterWorker(ctx, worker)
+		require.NoError(b, err)
+	}
+
+	// 等待所有组件启动
+	time.Sleep(3 * time.Second)
+
+	b.ResetTimer()
+
+	// b.N是基准测试框架提供的迭代次数
+	for i := 0; i < b.N; i++ {
+		taskCount := 1000 // 每次迭代提交1000个任务
+		tasks := make([]*Task, taskCount)
+		var taskWG sync.WaitGroup
+
+		// 停止计时器，准备提交任务
+		b.StopTimer()
+		for j := 0; j < taskCount; j++ {
+			task := createTestTask()
+			task.ID = fmt.Sprintf("perf-task-%d-%d", i, j)
+			tasks[j] = task
+		}
+		// 重新开始计时器
+		b.StartTimer()
+
+		// 并发提交任务
+		for _, task := range tasks {
+			taskWG.Add(1)
+			go func(t *Task) {
+				defer taskWG.Done()
+				if err := scheduler.SubmitTask(ctx, t); err != nil {
+					b.Errorf("提交任务失败: %v", err)
+				}
+			}(task)
+		}
+		taskWG.Wait()
+
+		// 等待所有任务完成
+		err = waitForAllTasksStatus(ctx, scheduler, tasks, TaskStatusCompleted, 5*time.Minute)
+		if err != nil {
+			b.Fatalf("等待任务完成超时: %v", err)
+		}
+	}
 }

@@ -2,9 +2,10 @@ package scheduler
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"math"
 	"math/rand"
 	"sort"
@@ -17,8 +18,8 @@ import (
 
 // 性能常量配置
 const (
-	// 默认虚拟节点数量
-	defaultVirtualNodes = 100
+	// 默认虚拟节点数量 - 使用较大的数量以获得更好的分布
+	defaultVirtualNodes = 150
 	// 最大批处理大小
 	maxBatchSize = 256
 	// 默认健康阈值
@@ -56,7 +57,7 @@ type TaskCountProvider interface {
 	getWorkerRunningTaskCount(ctx context.Context, workerID string) (int, error)
 }
 
-// LoadBalancer 高性能负载均衡器接口
+// LoadBalancer 负载均衡器接口
 type LoadBalancer interface {
 	// SelectWorker 根据策略选择最佳工作节点
 	SelectWorker(ctx context.Context, workers []*Worker, task *Task) (*Worker, error)
@@ -81,7 +82,7 @@ type WorkerCache struct {
 	hash      uint64
 }
 
-// FastRoundRobin 高性能轮询计数器
+// FastRoundRobin 轮询计数器
 type FastRoundRobin struct {
 	counter uint64
 	_       [7]uint64 // 缓存行填充，避免false sharing
@@ -173,7 +174,7 @@ type loadBalancer struct {
 	// 轮询状态
 	roundRobin FastRoundRobin
 
-	// 随机数生成器(使用goroutine-local storage优化)
+	// 随机数生成器
 	randPool sync.Pool
 
 	// 对象池
@@ -234,6 +235,10 @@ func (s *sortableWorkers) Swap(i, j int) {
 }
 func (s *sortableWorkers) Less(i, j int) bool {
 	if s.counts[i] == s.counts[j] {
+		if s.workers[i].Weight == s.workers[j].Weight {
+			// 权重相同时，按工作节点ID排序，确保结果可预测但分布均匀
+			return s.workers[i].ID < s.workers[j].ID
+		}
 		return s.workers[i].Weight > s.workers[j].Weight
 	}
 	return s.counts[i] < s.counts[j]
@@ -559,9 +564,29 @@ func (lb *loadBalancer) selectByLeastTasks(ctx context.Context, workers []*Worke
 		}
 	}
 
-	// 快速排序找到最小值
+	// 排序找到最小值
 	sort.Sort(sortable)
-	return sortable.workers[0], nil
+
+	// 找到所有具有最少任务数的工作节点
+	minTasks := sortable.counts[0]
+	minTaskWorkers := make([]*Worker, 0, len(workers))
+
+	for i, count := range sortable.counts {
+		if count == minTasks {
+			minTaskWorkers = append(minTaskWorkers, sortable.workers[i])
+		} else {
+			break // 因为已排序，后续任务数只会更多
+		}
+	}
+
+	// 如果只有一个工作节点有最少任务数，直接返回
+	if len(minTaskWorkers) == 1 {
+		return minTaskWorkers[0], nil
+	}
+
+	// 如果有多个工作节点有相同的最少任务数，使用轮询选择
+	idx := lb.roundRobin.Next(len(minTaskWorkers))
+	return minTaskWorkers[idx], nil
 }
 
 // selectByRoundRobin 轮询策略
@@ -641,6 +666,10 @@ func (lb *loadBalancer) selectByRandom(workers []*Worker) (*Worker, error) {
 
 // selectByConsistentHash 一致性哈希策略
 func (lb *loadBalancer) selectByConsistentHash(workers []*Worker, task *Task) (*Worker, error) {
+	if len(workers) == 0 {
+		return nil, ErrNoWorkersAvailable
+	}
+
 	if task == nil || task.ID == "" {
 		// 无任务ID时退化为随机选择
 		return lb.selectByRandom(workers)
@@ -653,55 +682,90 @@ func (lb *loadBalancer) selectByConsistentHash(workers []*Worker, task *Task) (*
 	}
 
 	// 计算任务哈希
-	hash := lb.fastHash(task.ID)
+	taskHash := lb.fastHash(task.ID)
 
-	// 在哈希环中查找最接近的节点
-	workerID := lb.findNodeInRing(ring, hash)
-
-	// 查找对应的工作节点
+	// 创建工作节点映射以快速查找
+	workerMap := make(map[string]*Worker, len(workers))
 	for _, worker := range workers {
-		if worker.ID == workerID {
+		workerMap[worker.ID] = worker
+	}
+
+	// 从哈希环中查找，支持多次尝试以处理不可用的节点
+	maxAttempts := 3 // 最多尝试3次
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// 每次尝试时微调哈希值，避免总是选择同一个不可用节点
+		adjustedHash := taskHash + uint64(attempt*131) // 使用质数增加随机性
+
+		workerID := lb.findNodeInRing(ring, adjustedHash)
+		if workerID == "" {
+			continue
+		}
+
+		// 查找对应的工作节点
+		if worker, exists := workerMap[workerID]; exists {
 			return worker, nil
 		}
 	}
 
-	// 降级为随机选择
+	// 如果所有尝试都失败，降级为随机选择
 	return lb.selectByRandom(workers)
 }
 
-// fastHash 快速哈希函数
+// fastHash 哈希函数
 func (lb *loadBalancer) fastHash(s string) uint64 {
-	h := fnv.New64a()
-	// 安全的字符串到字节切片转换
-	data := []byte(s)
-	h.Write(data)
-	return h.Sum64()
+	h := sha1.Sum([]byte(s))
+	// 使用SHA-1的前8个字节，通过binary包转换为uint64
+	return binary.BigEndian.Uint64(h[:8])
 }
 
 // getOrBuildHashRing 获取或构建哈希环
 func (lb *loadBalancer) getOrBuildHashRing(workers []*Worker) *ConsistentHashRing {
 	ring := lb.hashRing.Load().(*ConsistentHashRing)
 
-	// 更严格的重建检查：检查节点数量和节点ID
-	needRebuild := ring.count != len(workers)*lb.virtualNodes
+	// 检查是否需要重建哈希环
+	needRebuild := ring.count == 0
+
 	if !needRebuild && len(workers) > 0 {
-		// 检查节点ID是否发生变化
-		existingWorkerIDs := make(map[string]bool)
-		for _, node := range ring.nodes {
-			existingWorkerIDs[node.workerID] = true
+		// 计算当前工作节点的预期虚拟节点总数
+		expectedVirtualNodes := 0
+		for _, worker := range workers {
+			weight := worker.Weight
+			if weight <= 0 {
+				weight = 1
+			}
+			expectedVirtualNodes += lb.virtualNodes * weight
 		}
 
-		for _, worker := range workers {
-			if !existingWorkerIDs[worker.ID] {
+		// 检查虚拟节点总数是否匹配
+		if ring.count != expectedVirtualNodes {
+			needRebuild = true
+		} else {
+			// 检查工作节点ID集合是否发生变化
+			existingWorkerIDs := make(map[string]bool)
+			for _, node := range ring.nodes {
+				existingWorkerIDs[node.workerID] = true
+			}
+
+			currentWorkerIDs := make(map[string]bool)
+			for _, worker := range workers {
+				currentWorkerIDs[worker.ID] = true
+			}
+
+			// 比较两个集合是否相等
+			if len(existingWorkerIDs) != len(currentWorkerIDs) {
 				needRebuild = true
-				break
+			} else {
+				for workerID := range currentWorkerIDs {
+					if !existingWorkerIDs[workerID] {
+						needRebuild = true
+						break
+					}
+				}
 			}
 		}
-
-		// 检查是否有节点被移除
-		if !needRebuild && len(existingWorkerIDs) != len(workers) {
-			needRebuild = true
-		}
+	} else if len(workers) == 0 {
+		// 没有工作节点时，返回空环
+		return &ConsistentHashRing{nodes: make([]HashNode, 0), count: 0}
 	}
 
 	if needRebuild {
@@ -714,9 +778,16 @@ func (lb *loadBalancer) getOrBuildHashRing(workers []*Worker) *ConsistentHashRin
 
 // buildHashRing 构建哈希环
 func (lb *loadBalancer) buildHashRing(workers []*Worker) *ConsistentHashRing {
-	ring := &ConsistentHashRing{
-		nodes: make([]HashNode, 0, len(workers)*lb.virtualNodes),
+	if len(workers) == 0 {
+		return &ConsistentHashRing{nodes: make([]HashNode, 0), count: 0}
 	}
+
+	ring := &ConsistentHashRing{
+		nodes: make([]HashNode, 0),
+	}
+
+	// 每个权重单位对应80个虚拟节点，增加更多虚拟节点以获得更好分布
+	replicaCount := 80
 
 	for _, worker := range workers {
 		weight := worker.Weight
@@ -724,19 +795,23 @@ func (lb *loadBalancer) buildHashRing(workers []*Worker) *ConsistentHashRing {
 			weight = 1
 		}
 
-		virtualNodes := lb.virtualNodes * weight
-		for i := 0; i < virtualNodes; i++ {
-			virtualKey := fmt.Sprintf("%s#%d", worker.ID, i)
-			hash := lb.fastHash(virtualKey)
-			ring.nodes = append(ring.nodes, HashNode{
-				hash:     hash,
-				workerID: worker.ID,
-				weight:   weight,
-			})
+		// 为每个权重单位创建虚拟节点
+		for w := 0; w < weight; w++ {
+			for i := 0; i < replicaCount; i++ {
+				// 节点ID + 副本编号, 确保良好的分布
+				key := fmt.Sprintf("%s:%d:%d", worker.ID, w, i)
+				hash := lb.fastHash(key)
+
+				ring.nodes = append(ring.nodes, HashNode{
+					hash:     hash,
+					workerID: worker.ID,
+					weight:   weight,
+				})
+			}
 		}
 	}
 
-	// 排序哈希环
+	// 按哈希值排序所有虚拟节点
 	sort.Slice(ring.nodes, func(i, j int) bool {
 		return ring.nodes[i].hash < ring.nodes[j].hash
 	})
@@ -751,13 +826,14 @@ func (lb *loadBalancer) findNodeInRing(ring *ConsistentHashRing, hash uint64) st
 		return ""
 	}
 
-	// 二分查找
+	// 使用二分查找找到第一个哈希值大于等于目标哈希值的节点
 	idx := sort.Search(ring.count, func(i int) bool {
 		return ring.nodes[i].hash >= hash
 	})
 
-	if idx == ring.count {
-		idx = 0 // 环形结构
+	// 如果没有找到，则选择第一个节点（环形结构）
+	if idx >= ring.count {
+		idx = 0
 	}
 
 	return ring.nodes[idx].workerID

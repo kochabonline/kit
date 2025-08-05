@@ -63,8 +63,8 @@ func NewScheduler(etcdClient *etcd.Etcd, options *SchedulerOptions) (Scheduler, 
 		options.NodeID = generateNodeID()
 	}
 
-	// 创建事件总线
-	eventBus := NewEventBus(1000) // 1000个事件缓冲
+	// 创建具有动态扩容功能的事件总线
+	eventBus := NewEventBus(5000)
 
 	// 创建调度器实例
 	scheduler := &scheduler{
@@ -334,6 +334,16 @@ func (s *scheduler) RegisterWorker(ctx context.Context, worker *Worker) error {
 
 // UnregisterWorker 注销工作节点
 func (s *scheduler) UnregisterWorker(ctx context.Context, workerID string) error {
+	// 如果是Leader，先重新调度该工作节点的任务
+	if s.IsLeader() {
+		if err := s.rescheduleWorkerTasks(ctx, workerID); err != nil {
+			log.Error().Err(err).
+				Str("workerId", workerID).
+				Msg("failed to reschedule worker tasks before unregistering")
+			// 继续删除节点，不因为重新调度失败而阻止注销
+		}
+	}
+
 	// 删除工作节点
 	if err := s.deleteWorkerFromETCD(ctx, workerID); err != nil {
 		return fmt.Errorf("failed to delete worker: %w", err)
@@ -652,8 +662,23 @@ func (s *scheduler) handleWorkerWatchEvents(ctx context.Context, watchResp clien
 			})
 
 		case clientv3.EventTypeDelete:
-			// 工作节点被删除
-			log.Debug().Str("key", string(event.Kv.Key)).Msg("worker deleted")
+			// 工作节点被删除，需要重新调度其任务
+			key := string(event.Kv.Key)
+			log.Debug().Str("key", key).Msg("worker deleted")
+
+			// 从key中提取workerID
+			parts := strings.Split(key, "/")
+			if len(parts) > 0 {
+				workerID := parts[len(parts)-1]
+				if workerID != "" {
+					// 发布工作节点离开事件
+					s.publishEvent(&SchedulerEvent{
+						Type:      EventWorkerLeft,
+						WorkerID:  workerID,
+						Timestamp: currentTimestamp(),
+					})
+				}
+			}
 		}
 	}
 }
@@ -735,7 +760,13 @@ func (s *scheduler) checkAndSchedulePendingTasks(ctx context.Context) {
 		Msg("pending task safety net: found unscheduled tasks with available workers")
 
 	// 调度这些任务
-	s.schedulePendingTasksForNewWorker(ctx)
+	for _, task := range tasks {
+		if err := s.scheduleTask(ctx, task.ID); err != nil {
+			log.Error().Err(err).
+				Str("taskId", task.ID).
+				Msg("failed to schedule pending task")
+		}
+	}
 }
 
 // runMetricsCollection 运行指标收集
@@ -1097,12 +1128,16 @@ func (s *scheduler) schedulePendingTasksForNewWorker(ctx context.Context) {
 
 	// 为可用的工作节点调度任务
 	scheduledCount := 0
-	for i, task := range tasks {
-		if i >= len(workers) {
-			break // 工作节点不足，剩余任务等待下次调度
+	for _, task := range tasks {
+		// 使用负载均衡策略选择最佳工作节点
+		worker, err := s.selectBestWorker(ctx, workers, task)
+		if err != nil {
+			log.Error().Err(err).
+				Str("taskId", task.ID).
+				Msg("failed to select worker for task")
+			continue
 		}
 
-		worker := workers[i]
 		if err := s.assignTaskToWorker(ctx, task, worker); err != nil {
 			log.Error().Err(err).
 				Str("taskId", task.ID).
@@ -1127,17 +1162,45 @@ func (s *scheduler) rescheduleWorkerTasks(ctx context.Context, workerID string) 
 		return err
 	}
 
-	// 重新调度该工作节点的运行中任务
+	rescheduledCount := 0
+	// 重新调度该工作节点的运行中和已调度任务
 	for _, task := range tasks {
-		if task.WorkerID == workerID && task.Status == TaskStatusRunning {
+		if task.WorkerID == workerID && (task.Status == TaskStatusRunning || task.Status == TaskStatusScheduled) {
+			oldStatus := task.Status
 			task.Status = TaskStatusPending
 			task.WorkerID = ""
+			task.ScheduledAt = 0 // 清除调度时间
 			task.UpdatedAt = currentTimestamp()
 
 			if err := s.saveTaskToETCD(ctx, task); err != nil {
-				log.Error().Err(err).Str("taskId", task.ID).Msg("failed to reschedule task")
+				log.Error().Err(err).
+					Str("taskId", task.ID).
+					Str("oldStatus", oldStatus.String()).
+					Msg("failed to reschedule task")
+			} else {
+				rescheduledCount++
+				log.Info().
+					Str("taskId", task.ID).
+					Str("oldStatus", oldStatus.String()).
+					Str("workerId", workerID).
+					Msg("task rescheduled due to worker offline")
 			}
 		}
+	}
+
+	// 清理任务分配记录
+	assignedPrefix := fmt.Sprintf("%stasks/assigned/%s/", s.options.EtcdKeyPrefix, workerID)
+	if _, err := s.etcdClient.Client.Delete(ctx, assignedPrefix, clientv3.WithPrefix()); err != nil {
+		log.Error().Err(err).
+			Str("workerId", workerID).
+			Msg("failed to clean up task assignments")
+	}
+
+	if rescheduledCount > 0 {
+		log.Info().
+			Str("workerId", workerID).
+			Int("rescheduledCount", rescheduledCount).
+			Msg("completed rescheduling tasks for offline worker")
 	}
 
 	return nil
@@ -1160,7 +1223,7 @@ func (s *scheduler) getWorkerRunningTaskCount(ctx context.Context, workerID stri
 	// 统计运行中的任务
 	runningTasks := 0
 	for _, kv := range resp.Kvs {
-		var taskData map[string]interface{}
+		var taskData map[string]any
 		if err := json.Unmarshal(kv.Value, &taskData); err != nil {
 			continue
 		}
