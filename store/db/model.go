@@ -17,27 +17,26 @@ const (
 	DriverSQLite     Driver = "sqlite"
 )
 
-// orm 类型
-type Orm string
-
-const (
-	OrmGorm Orm = "gorm"
-	OrmEnt  Orm = "ent"
-)
-
 // Config 数据库配置结构体
 type Config struct {
 	Driver       Driver       `json:"driver" default:"mysql"`
-	Orm          Orm          `json:"orm" default:"gorm"`
 	DriverConfig DriverConfig `json:"driverConfig"`
 }
 
 // DriverConfig 接口定义
 // 用于不同数据库驱动的配置实现
 type DriverConfig interface {
-	init() error
+	Init() error
 	Dsn() string
-	LogLevel() int
+	Level() int
+	CloneConn() *Connection
+}
+
+// Connection 连接池配置
+type Connection struct {
+	MaxIdleConns    int
+	MaxOpenConns    int
+	ConnMaxLifetime int
 }
 
 // Mysql 配置
@@ -54,15 +53,15 @@ type MysqlConfig struct {
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
 	MaxOpenConns    int    `json:"maxOpenConns" default:"100"`
 	ConnMaxLifetime int    `json:"connMaxLifetime" default:"3600"`
-	Level           string `json:"level" default:"silent"`
+	LogLevel        string `json:"logLevel" default:"silent"`
 }
 
-func (c *MysqlConfig) init() error {
+func (c *MysqlConfig) Init() error {
 	return reflect.SetDefaultTag(c)
 }
 
 func (c *MysqlConfig) Dsn() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%t&loc=%s&timeout=%ds&maxIdleConns=%d&maxOpenConns=%d&connMaxLifetime=%ds&level=%s",
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%t&loc=%s&timeout=%ds",
 		c.User,
 		c.Password,
 		c.Host,
@@ -72,15 +71,11 @@ func (c *MysqlConfig) Dsn() string {
 		c.ParseTime,
 		c.Loc,
 		c.Timeout,
-		c.MaxIdleConns,
-		c.MaxOpenConns,
-		c.ConnMaxLifetime,
-		strings.ToLower(c.Level),
 	)
 }
 
-func (c *MysqlConfig) LogLevel() int {
-	switch strings.ToLower(c.Level) {
+func (c *MysqlConfig) Level() int {
+	switch strings.ToLower(c.LogLevel) {
 	case "silent":
 		return 0
 	case "error":
@@ -91,6 +86,14 @@ func (c *MysqlConfig) LogLevel() int {
 		return 3
 	default:
 		return 0 // 默认返回 silent
+	}
+}
+
+func (c *MysqlConfig) CloneConn() *Connection {
+	return &Connection{
+		MaxIdleConns:    c.MaxIdleConns,
+		MaxOpenConns:    c.MaxOpenConns,
+		ConnMaxLifetime: c.ConnMaxLifetime,
 	}
 }
 
@@ -106,15 +109,15 @@ type PostgresConfig struct {
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
 	MaxOpenConns    int    `json:"maxOpenConns" default:"100"`
 	ConnMaxLifetime int    `json:"connMaxLifetime" default:"3600"`
-	Level           string `json:"level" default:"silent"`
+	LogLevel        string `json:"logLevel" default:"silent"`
 }
 
-func (c *PostgresConfig) init() error {
+func (c *PostgresConfig) Init() error {
 	return reflect.SetDefaultTag(c)
 }
 
 func (c *PostgresConfig) Dsn() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d max_idle_conns=%d max_open_conns=%d conn_max_lifetime=%ds level=%s",
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d",
 		c.Host,
 		c.Port,
 		c.User,
@@ -122,15 +125,11 @@ func (c *PostgresConfig) Dsn() string {
 		c.Database,
 		c.SSLMode,
 		c.ConnectTimeout,
-		c.MaxIdleConns,
-		c.MaxOpenConns,
-		c.ConnMaxLifetime,
-		strings.ToLower(c.Level),
 	)
 }
 
-func (c *PostgresConfig) LogLevel() int {
-	switch strings.ToLower(c.Level) {
+func (c *PostgresConfig) Level() int {
+	switch strings.ToLower(c.LogLevel) {
 	case "silent":
 		return 0
 	case "error":
@@ -141,6 +140,14 @@ func (c *PostgresConfig) LogLevel() int {
 		return 3
 	default:
 		return 0 // 默认返回 silent
+	}
+}
+
+func (c *PostgresConfig) CloneConn() *Connection {
+	return &Connection{
+		MaxIdleConns:    c.MaxIdleConns,
+		MaxOpenConns:    c.MaxOpenConns,
+		ConnMaxLifetime: c.ConnMaxLifetime,
 	}
 }
 
@@ -155,30 +162,26 @@ type SQLiteConfig struct {
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
 	MaxOpenConns    int    `json:"maxOpenConns" default:"100"`
 	ConnMaxLifetime int    `json:"connMaxLifetime" default:"3600"`
-	Level           string `json:"level" default:"silent"`
+	LogLevel        string `json:"logLevel" default:"silent"`
 }
 
-func (c *SQLiteConfig) init() error {
+func (c *SQLiteConfig) Init() error {
 	return reflect.SetDefaultTag(c)
 }
 
 func (c *SQLiteConfig) Dsn() string {
-	return fmt.Sprintf("file:%s?cache=%s&mode=rw&_busy_timeout=%d&_sync=%s&_foreign_keys=%t&_cache=%s&max_idle_conns=%d&max_open_conns=%d&conn_max_lifetime=%ds&level=%s",
+	return fmt.Sprintf("file:%s?cache=%s&mode=rw&_busy_timeout=%d&_sync=%s&_foreign_keys=%t&_cache=%s",
 		c.FilePath,
 		strconv.Itoa(c.CacheSize),
 		c.BusyTimeout,
 		c.SyncMode,
 		c.ForeignKeys,
 		c.CacheMode,
-		c.MaxIdleConns,
-		c.MaxOpenConns,
-		c.ConnMaxLifetime,
-		strings.ToLower(c.Level),
 	)
 }
 
-func (c *SQLiteConfig) LogLevel() int {
-	switch strings.ToLower(c.Level) {
+func (c *SQLiteConfig) Level() int {
+	switch strings.ToLower(c.LogLevel) {
 	case "silent":
 		return 0
 	case "error":
@@ -189,5 +192,13 @@ func (c *SQLiteConfig) LogLevel() int {
 		return 3
 	default:
 		return 0 // 默认返回 silent
+	}
+}
+
+func (c *SQLiteConfig) CloneConn() *Connection {
+	return &Connection{
+		MaxIdleConns:    c.MaxIdleConns,
+		MaxOpenConns:    c.MaxOpenConns,
+		ConnMaxLifetime: c.ConnMaxLifetime,
 	}
 }

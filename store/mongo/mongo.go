@@ -45,14 +45,14 @@ func (m *Mongo) new() (*Mongo, error) {
 	}
 	m.Client = client
 
-	if err := m.ping(); err != nil {
+	if err := m.Ping(); err != nil {
 		return nil, err
 	}
 
 	return m, nil
 }
 
-func (m *Mongo) ping() error {
+func (m *Mongo) Ping() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(m.config.Timeout)*time.Second)
 	defer cancel()
 
