@@ -1,8 +1,5 @@
 # Kit - Go微服务工具包
 
-[![Go](https://img.shields.io/badge/Go-1.24.2-blue.svg)](https://golang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
 Kit是一个功能丰富的Go语言微服务工具包，提供了构建生产级微服务所需的各种组件和工具。
 
 ## 项目特性
