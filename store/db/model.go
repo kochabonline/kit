@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -17,18 +16,23 @@ const (
 	DriverSQLite     Driver = "sqlite"
 )
 
-// Config 数据库配置结构体
-type Config struct {
-	Driver       Driver       `json:"driver" default:"mysql"`
-	DriverConfig DriverConfig `json:"driverConfig"`
-}
+// 日志级别
+type Level int
+
+const (
+	LevelSilent Level = iota
+	LevelError
+	LevelWarn
+	LevelInfo
+)
 
 // DriverConfig 接口定义
 // 用于不同数据库驱动的配置实现
 type DriverConfig interface {
+	Driver() Driver
 	Init() error
 	Dsn() string
-	Level() int
+	LogLevel() Level
 	CloneConn() *Connection
 }
 
@@ -37,6 +41,22 @@ type Connection struct {
 	MaxIdleConns    int
 	MaxOpenConns    int
 	ConnMaxLifetime int
+}
+
+// getLogLevel 获取日志级别
+func getLogLevel(level string) Level {
+	switch strings.ToLower(level) {
+	case "silent":
+		return LevelSilent
+	case "error":
+		return LevelError
+	case "warn":
+		return LevelWarn
+	case "info":
+		return LevelInfo
+	default:
+		return LevelSilent // 默认返回 silent
+	}
 }
 
 // Mysql 配置
@@ -53,7 +73,11 @@ type MysqlConfig struct {
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
 	MaxOpenConns    int    `json:"maxOpenConns" default:"100"`
 	ConnMaxLifetime int    `json:"connMaxLifetime" default:"3600"`
-	LogLevel        string `json:"logLevel" default:"silent"`
+	Level           string `json:"level" default:"silent"`
+}
+
+func (c *MysqlConfig) Driver() Driver {
+	return DriverMySQL
 }
 
 func (c *MysqlConfig) Init() error {
@@ -61,32 +85,31 @@ func (c *MysqlConfig) Init() error {
 }
 
 func (c *MysqlConfig) Dsn() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%t&loc=%s&timeout=%ds",
-		c.User,
-		c.Password,
-		c.Host,
-		c.Port,
-		c.Database,
-		c.Charset,
-		c.ParseTime,
-		c.Loc,
-		c.Timeout,
-	)
+	var builder strings.Builder
+	builder.Grow(128)
+	builder.WriteString(c.User)
+	builder.WriteString(":")
+	builder.WriteString(c.Password)
+	builder.WriteString("@tcp(")
+	builder.WriteString(c.Host)
+	builder.WriteString(":")
+	builder.WriteString(strconv.Itoa(c.Port))
+	builder.WriteString(")/")
+	builder.WriteString(c.Database)
+	builder.WriteString("?charset=")
+	builder.WriteString(c.Charset)
+	builder.WriteString("&parseTime=")
+	builder.WriteString(strconv.FormatBool(c.ParseTime))
+	builder.WriteString("&loc=")
+	builder.WriteString(c.Loc)
+	builder.WriteString("&timeout=")
+	builder.WriteString(strconv.Itoa(c.Timeout))
+	builder.WriteString("s")
+	return builder.String()
 }
 
-func (c *MysqlConfig) Level() int {
-	switch strings.ToLower(c.LogLevel) {
-	case "silent":
-		return 0
-	case "error":
-		return 1
-	case "warn":
-		return 2
-	case "info":
-		return 3
-	default:
-		return 0 // 默认返回 silent
-	}
+func (c *MysqlConfig) LogLevel() Level {
+	return getLogLevel(c.Level)
 }
 
 func (c *MysqlConfig) CloneConn() *Connection {
@@ -109,7 +132,11 @@ type PostgresConfig struct {
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
 	MaxOpenConns    int    `json:"maxOpenConns" default:"100"`
 	ConnMaxLifetime int    `json:"connMaxLifetime" default:"3600"`
-	LogLevel        string `json:"logLevel" default:"silent"`
+	Level           string `json:"level" default:"silent"`
+}
+
+func (c *PostgresConfig) Driver() Driver {
+	return DriverPostgreSQL
 }
 
 func (c *PostgresConfig) Init() error {
@@ -117,30 +144,27 @@ func (c *PostgresConfig) Init() error {
 }
 
 func (c *PostgresConfig) Dsn() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d",
-		c.Host,
-		c.Port,
-		c.User,
-		c.Password,
-		c.Database,
-		c.SSLMode,
-		c.ConnectTimeout,
-	)
+	var builder strings.Builder
+	builder.Grow(128)
+	builder.WriteString("host=")
+	builder.WriteString(c.Host)
+	builder.WriteString(" port=")
+	builder.WriteString(strconv.Itoa(c.Port))
+	builder.WriteString(" user=")
+	builder.WriteString(c.User)
+	builder.WriteString(" password=")
+	builder.WriteString(c.Password)
+	builder.WriteString(" dbname=")
+	builder.WriteString(c.Database)
+	builder.WriteString(" sslmode=")
+	builder.WriteString(c.SSLMode)
+	builder.WriteString(" connect_timeout=")
+	builder.WriteString(strconv.Itoa(c.ConnectTimeout))
+	return builder.String()
 }
 
-func (c *PostgresConfig) Level() int {
-	switch strings.ToLower(c.LogLevel) {
-	case "silent":
-		return 0
-	case "error":
-		return 1
-	case "warn":
-		return 2
-	case "info":
-		return 3
-	default:
-		return 0 // 默认返回 silent
-	}
+func (c *PostgresConfig) LogLevel() Level {
+	return getLogLevel(c.Level)
 }
 
 func (c *PostgresConfig) CloneConn() *Connection {
@@ -162,7 +186,11 @@ type SQLiteConfig struct {
 	MaxIdleConns    int    `json:"maxIdleConns" default:"10"`
 	MaxOpenConns    int    `json:"maxOpenConns" default:"100"`
 	ConnMaxLifetime int    `json:"connMaxLifetime" default:"3600"`
-	LogLevel        string `json:"logLevel" default:"silent"`
+	Level           string `json:"level" default:"silent"`
+}
+
+func (c *SQLiteConfig) Driver() Driver {
+	return DriverSQLite
 }
 
 func (c *SQLiteConfig) Init() error {
@@ -170,29 +198,25 @@ func (c *SQLiteConfig) Init() error {
 }
 
 func (c *SQLiteConfig) Dsn() string {
-	return fmt.Sprintf("file:%s?cache=%s&mode=rw&_busy_timeout=%d&_sync=%s&_foreign_keys=%t&_cache=%s",
-		c.FilePath,
-		strconv.Itoa(c.CacheSize),
-		c.BusyTimeout,
-		c.SyncMode,
-		c.ForeignKeys,
-		c.CacheMode,
-	)
+	var builder strings.Builder
+	builder.Grow(128)
+	builder.WriteString("file:")
+	builder.WriteString(c.FilePath)
+	builder.WriteString("?cache=")
+	builder.WriteString(strconv.Itoa(c.CacheSize))
+	builder.WriteString("&mode=rw&_busy_timeout=")
+	builder.WriteString(strconv.Itoa(c.BusyTimeout))
+	builder.WriteString("&_sync=")
+	builder.WriteString(c.SyncMode)
+	builder.WriteString("&_foreign_keys=")
+	builder.WriteString(strconv.FormatBool(c.ForeignKeys))
+	builder.WriteString("&_cache=")
+	builder.WriteString(c.CacheMode)
+	return builder.String()
 }
 
-func (c *SQLiteConfig) Level() int {
-	switch strings.ToLower(c.LogLevel) {
-	case "silent":
-		return 0
-	case "error":
-		return 1
-	case "warn":
-		return 2
-	case "info":
-		return 3
-	default:
-		return 0 // 默认返回 silent
-	}
+func (c *SQLiteConfig) LogLevel() Level {
+	return getLogLevel(c.Level)
 }
 
 func (c *SQLiteConfig) CloneConn() *Connection {

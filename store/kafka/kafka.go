@@ -11,20 +11,23 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Kafka 客户端封装，提供生产者和消费者的管理
 type Kafka struct {
-	config    *Config
-	dialer    *kafka.Dialer
-	transport *kafka.Transport
-	producers map[string]*kafka.Writer
-	consumers map[string]*kafka.Reader
-	mu        sync.Mutex
+	config    *Config                  // 配置信息
+	dialer    *kafka.Dialer            // 连接拨号器
+	transport *kafka.Transport         // 传输配置
+	producers map[string]*kafka.Writer // 生产者映射表，按主题存储
+	consumers map[string]*kafka.Reader // 消费者映射表，按主题或主题-组合ID存储
+	mu        sync.Mutex               // 互斥锁，保护并发访问
 }
 
+// Option 配置选项函数类型
 type Option func(*Kafka)
 
-func New(c *Config, opts ...Option) (*Kafka, error) {
+// New 创建新的Kafka客户端实例
+func New(config *Config, opts ...Option) (*Kafka, error) {
 	k := &Kafka{
-		config:    c,
+		config:    config,
 		producers: make(map[string]*kafka.Writer),
 		consumers: make(map[string]*kafka.Reader),
 	}
@@ -43,6 +46,7 @@ func New(c *Config, opts ...Option) (*Kafka, error) {
 	return k, nil
 }
 
+// mechanism 创建SASL认证机制
 func (k *Kafka) mechanism() plain.Mechanism {
 	return plain.Mechanism{
 		Username: k.config.Username,
@@ -50,6 +54,7 @@ func (k *Kafka) mechanism() plain.Mechanism {
 	}
 }
 
+// createDialer 创建Kafka连接拨号器
 func (k *Kafka) createDialer() *kafka.Dialer {
 	dialer := &kafka.Dialer{
 		Timeout:   time.Duration(k.config.Timeout) * time.Second,
@@ -63,6 +68,7 @@ func (k *Kafka) createDialer() *kafka.Dialer {
 	return dialer
 }
 
+// createTransport 创建Kafka传输配置
 func (k *Kafka) createTransport() *kafka.Transport {
 	transport := &kafka.Transport{}
 
@@ -73,6 +79,7 @@ func (k *Kafka) createTransport() *kafka.Transport {
 	return transport
 }
 
+// Producer 获取指定主题的同步生产者，如果不存在则创建
 func (k *Kafka) Producer(topic string) *kafka.Writer {
 	k.mu.Lock()
 	writer, exists := k.producers[topic]
@@ -96,6 +103,7 @@ func (k *Kafka) Producer(topic string) *kafka.Writer {
 	return writer
 }
 
+// AsyncProducer 获取指定主题的异步生产者，如果不存在则创建
 func (k *Kafka) AsyncProducer(topic string) *kafka.Writer {
 	k.mu.Lock()
 	writer, exists := k.producers[topic]
@@ -120,6 +128,7 @@ func (k *Kafka) AsyncProducer(topic string) *kafka.Writer {
 	return writer
 }
 
+// Consumer 获取指定主题的消费者，如果不存在则创建
 func (k *Kafka) Consumer(topic string) *kafka.Reader {
 	k.mu.Lock()
 	reader, exists := k.consumers[topic]
@@ -144,6 +153,7 @@ func (k *Kafka) Consumer(topic string) *kafka.Reader {
 	return reader
 }
 
+// ConsumerGroup 获取指定主题和消费者组的消费者，如果不存在则创建
 func (k *Kafka) ConsumerGroup(topic string, groupId string) *kafka.Reader {
 	var builder strings.Builder
 	builder.WriteString(topic)
@@ -174,18 +184,21 @@ func (k *Kafka) ConsumerGroup(topic string, groupId string) *kafka.Reader {
 	return reader
 }
 
+// Close 关闭所有的生产者和消费者连接
 func (k *Kafka) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(k.config.CloseTimeout)*time.Second)
 	defer cancel()
 
 	eg, _ := errgroup.WithContext(ctx)
 
+	// 并发关闭所有生产者
 	for _, producer := range k.producers {
 		producer := producer
 		eg.Go(func() error {
 			return producer.Close()
 		})
 	}
+	// 并发关闭所有消费者
 	for _, consumer := range k.consumers {
 		consumer := consumer
 		eg.Go(func() error {

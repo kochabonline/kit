@@ -9,8 +9,8 @@ import (
 )
 
 func TestTokenBucketAllow(t *testing.T) {
-	r, err := redis.NewClient(&redis.Config{
-		Password: "",
+	r, err := redis.NewClient(&redis.SingleConfig{
+		Password: "12345678",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -27,8 +27,8 @@ func TestTokenBucketAllow(t *testing.T) {
 }
 
 func TestTokenBucketAllowN(t *testing.T) {
-	r, err := redis.NewClient(&redis.Config{
-		Password: "",
+	r, err := redis.NewClient(&redis.SingleConfig{
+		Password: "12345678",
 	})
 	if err != nil {
 		t.Fatal(err)

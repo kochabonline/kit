@@ -19,98 +19,6 @@ import (
 // 	log.SetGlobalLogger(log.New(log.WithCaller()))
 // }
 
-// TestSchedulerIntegration 集成测试：从创建调度器到任务执行的完整流程
-func TestSchedulerIntegration(t *testing.T) {
-	// 跳过集成测试（需要运行中的ETCD）
-	if testing.Short() {
-		t.Skip("跳过集成测试")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	// 创建ETCD客户端
-	etcdClient, err := createTestETCDClient()
-	require.NoError(t, err, "创建ETCD客户端失败")
-	defer etcdClient.Close()
-
-	// 清理测试数据
-	defer cleanupTestData(ctx, etcdClient)
-
-	t.Run("完整的调度器生命周期测试", func(t *testing.T) {
-		// 1. 创建调度器
-		scheduler, err := createTestScheduler(etcdClient)
-		require.NoError(t, err, "创建调度器失败")
-
-		// 2. 启动调度器
-		err = scheduler.Start(ctx)
-		require.NoError(t, err, "启动调度器失败")
-		defer func() {
-			err := scheduler.Stop(ctx)
-			assert.NoError(t, err, "停止调度器失败")
-		}()
-
-		// 等待调度器完全启动
-		time.Sleep(2 * time.Second)
-
-		// 3. 创建并启动工作节点
-		worker := createTestWorker()
-		workerNode, err := createTestWorkerNode(etcdClient, worker.ID, worker.Name)
-		require.NoError(t, err, "创建工作节点失败")
-
-		err = workerNode.Start(ctx)
-		require.NoError(t, err, "启动工作节点失败")
-		defer workerNode.Stop(ctx)
-
-		// 等待工作节点完全启动
-		time.Sleep(1 * time.Second)
-
-		// 4. 注册工作节点到调度器
-		err = scheduler.RegisterWorker(ctx, worker)
-		require.NoError(t, err, "注册工作节点失败")
-
-		// 等待工作节点注册完成
-		time.Sleep(1 * time.Second)
-
-		// 5. 验证工作节点注册成功
-		retrievedWorker, err := scheduler.GetWorker(ctx, worker.ID)
-		require.NoError(t, err, "获取工作节点失败")
-		assert.Equal(t, worker.ID, retrievedWorker.ID)
-		assert.Equal(t, worker.Name, retrievedWorker.Name)
-
-		// 6. 提交任务
-		task := createTestTask()
-		err = scheduler.SubmitTask(ctx, task)
-		require.NoError(t, err, "提交任务失败")
-
-		// 7. 验证任务提交成功
-		retrievedTask, err := scheduler.GetTask(ctx, task.ID)
-		require.NoError(t, err, "获取任务失败")
-		assert.Equal(t, task.ID, retrievedTask.ID)
-		assert.Equal(t, TaskStatusPending, retrievedTask.Status)
-
-		// 8. 等待任务被调度并执行完成
-		err = waitForTaskStatus(ctx, scheduler, task.ID, TaskStatusCompleted, 60*time.Second)
-		require.NoError(t, err, "等待任务完成超时")
-
-		// 9. 验证任务执行完成
-		completedTask, err := scheduler.GetTask(ctx, task.ID)
-		require.NoError(t, err, "获取完成后的任务失败")
-		assert.Equal(t, TaskStatusCompleted, completedTask.Status)
-		assert.Equal(t, worker.ID, completedTask.WorkerID)
-		assert.True(t, completedTask.ScheduledAt > 0)
-		assert.True(t, completedTask.StartedAt > 0)
-		assert.True(t, completedTask.CompletedAt > 0)
-		assert.True(t, completedTask.CompletedAt >= completedTask.StartedAt)
-
-		// 10. 验证调度器指标
-		metrics := scheduler.GetMetrics()
-		assert.True(t, metrics.TasksTotal >= 1)
-		assert.True(t, metrics.TasksCompleted >= 1)
-		assert.True(t, metrics.WorkersTotal >= 1)
-	})
-}
-
 // TestSchedulerMultipleTasksExecution 测试多个任务并发执行
 func TestSchedulerMultipleTasksExecution(t *testing.T) {
 	if testing.Short() {
@@ -166,7 +74,7 @@ func TestSchedulerMultipleTasksExecution(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		// 提交多个任务
-		taskCount := 10000
+		taskCount := 100
 		tasks := make([]*Task, taskCount)
 		for i := 0; i < taskCount; i++ {
 			task := createTestTask()

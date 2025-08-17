@@ -7,12 +7,9 @@ import (
 )
 
 // mockConfig 用于测试
-func mockConfig() *Config {
-	return &Config{
-		Driver:       DriverMySQL,
-		DriverConfig: &MysqlConfig{
-			Password: "12345678",
-		},
+func mockConfig() DriverConfig {
+	return &MysqlConfig{
+		Password: "12345678",
 	}
 }
 

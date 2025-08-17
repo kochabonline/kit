@@ -21,15 +21,15 @@ var (
 
 // Gorm GORM 数据库连接包装器
 type Gorm struct {
+	config DriverConfig
 	DB     *gorm.DB
-	config *Config
 }
 
 // GormOption Gorm 配置选项函数类型
 type GormOption func(*Gorm)
 
 // NewGorm 创建新的 Gorm 实例
-func NewGorm(config *Config, opts ...GormOption) (*Gorm, error) {
+func NewGorm(config DriverConfig, opts ...GormOption) (*Gorm, error) {
 	if config == nil {
 		return nil, ErrInvalidConfig
 	}
@@ -39,7 +39,7 @@ func NewGorm(config *Config, opts ...GormOption) (*Gorm, error) {
 	}
 
 	// 初始化驱动配置
-	if err := config.DriverConfig.Init(); err != nil {
+	if err := config.Init(); err != nil {
 		return nil, err
 	}
 
@@ -70,14 +70,14 @@ func NewGorm(config *Config, opts ...GormOption) (*Gorm, error) {
 // createDB 创建数据库连接
 func (g *Gorm) createDB() (*gorm.DB, error) {
 	gormConfig := &gorm.Config{
-		Logger: logger.Default.LogMode(logger.LogLevel(g.config.DriverConfig.Level())),
+		Logger: logger.Default.LogMode(logger.LogLevel(g.config.LogLevel())),
 	}
-	dsn := g.config.DriverConfig.Dsn()
+	dsn := g.config.Dsn()
 
 	var db *gorm.DB
 	var err error
 
-	switch g.config.Driver {
+	switch g.config.Driver() {
 	case DriverMySQL:
 		db, err = gorm.Open(mysql.Open(dsn), gormConfig)
 	case DriverPostgreSQL:
@@ -107,7 +107,7 @@ func (g *Gorm) setConnectionPool(db *gorm.DB) error {
 		return err
 	}
 
-	connConfig := g.config.DriverConfig.CloneConn()
+	connConfig := g.config.CloneConn()
 	sqlDB.SetMaxIdleConns(connConfig.MaxIdleConns)
 	sqlDB.SetMaxOpenConns(connConfig.MaxOpenConns)
 	sqlDB.SetConnMaxLifetime(time.Duration(connConfig.ConnMaxLifetime) * time.Second)
@@ -116,7 +116,6 @@ func (g *Gorm) setConnectionPool(db *gorm.DB) error {
 }
 
 // Ping 测试数据库连接是否正常
-// 返回错误表示连接不可用
 func (g *Gorm) Ping(ctx context.Context) error {
 	if g.DB == nil {
 		return ErrGormNotInitialized

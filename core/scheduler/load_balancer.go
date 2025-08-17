@@ -137,7 +137,7 @@ func (p *BalancerPool) GetWorkerSlice() []*Worker {
 // PutWorkerSlice 归还工作节点切片
 func (p *BalancerPool) PutWorkerSlice(slice []*Worker) {
 	if cap(slice) <= 128 {
-		p.workerSlicePool.Put(slice)
+		p.workerSlicePool.Put(&slice)
 	}
 }
 
@@ -149,7 +149,7 @@ func (p *BalancerPool) GetIndexSlice() []int {
 // PutIndexSlice 归还索引切片
 func (p *BalancerPool) PutIndexSlice(slice []int) {
 	if cap(slice) <= 128 {
-		p.indexSlicePool.Put(slice)
+		p.indexSlicePool.Put(&slice)
 	}
 }
 

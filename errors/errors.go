@@ -12,6 +12,13 @@ const (
 	UnknownCode = 500
 )
 
+// Status represents the status of an error with code, message and metadata
+type Status struct {
+	Code     int32             `json:"code,omitempty"`
+	Message  string            `json:"message,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
 // Error represents a structured error with HTTP status code, message, metadata and cause chain
 type Error struct {
 	Status

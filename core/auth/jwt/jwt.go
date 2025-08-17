@@ -1,104 +1,213 @@
 package jwt
 
 import (
+	"errors"
+	"reflect"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type Jwt struct {
+// JWT represents the JWT handler
+type JWT struct {
 	config *Config
 }
 
-func New(config *Config) (*Jwt, error) {
+// New creates a new JWT instance
+func New(config *Config) (*JWT, error) {
 	if err := config.init(); err != nil {
 		return nil, err
 	}
-	return &Jwt{config: config}, nil
+	return &JWT{config: config}, nil
 }
 
-type Option struct {
-	jti string
+// Generate creates a JWT token from any struct that embeds jwt.RegisteredClaims
+func (j *JWT) Generate(claims jwt.Claims) (string, error) {
+	return j.generate(claims, j.config.Expire)
 }
 
-func WithJti(jti string) func(*Option) {
-	return func(o *Option) {
-		o.jti = jti
-	}
+// GenerateRefreshToken creates a refresh token from any struct that embeds jwt.RegisteredClaims
+func (j *JWT) GenerateRefreshToken(claims jwt.Claims) (string, error) {
+	return j.generate(claims, j.config.RefreshExpire)
 }
 
-func GetJti(claims jwt.MapClaims) (string, error) {
-	jti, ok := claims["jti"].(string)
-	if !ok {
-		return "", jwt.ErrTokenInvalidId
+// GenerateWithJTI creates a token with a specific JTI
+func (j *JWT) GenerateWithJTI(claims jwt.Claims, jti string) (string, error) {
+	if err := j.setJTI(claims, jti); err != nil {
+		return "", err
 	}
-	return jti, nil
+	return j.Generate(claims)
 }
 
-func setClaim(claims map[string]any, key string, value any) {
-	if value != nil && value != "" && value != 0 {
-		claims[key] = value
+// GenerateRefreshTokenWithJTI creates a refresh token with a specific JTI
+func (j *JWT) GenerateRefreshTokenWithJTI(claims jwt.Claims, jti string) (string, error) {
+	if err := j.setJTI(claims, jti); err != nil {
+		return "", err
 	}
+	return j.GenerateRefreshToken(claims)
 }
 
-func (j *Jwt) generate(claims jwt.MapClaims, expire int64, opts ...func(*Option)) (string, error) {
-	option := &Option{}
-	for _, opt := range opts {
-		opt(option)
+// generate is the internal method that creates tokens
+func (j *JWT) generate(claims jwt.Claims, expire int64) (string, error) {
+	// Set standard claims if they are not already set
+	if err := j.setStandardClaims(claims, expire); err != nil {
+		return "", err
 	}
-
-	now := time.Now().Unix()
-
-	claims["exp"] = now + expire
-	if j.config.IssuedAt != 0 {
-		claims["iat"] = now + j.config.IssuedAt
-	}
-	if j.config.NotBefore != 0 {
-		claims["nbf"] = now + j.config.NotBefore
-	}
-	setClaim(claims, "aud", j.config.Audience)
-	setClaim(claims, "iss", j.config.Issuer)
-	setClaim(claims, "sub", j.config.Subject)
-	setClaim(claims, "jti", option.jti)
 
 	token := jwt.NewWithClaims(j.config.signingMethod(), claims)
 	return token.SignedString([]byte(j.config.Secret))
 }
 
-func (j *Jwt) Generate(claims jwt.MapClaims, opts ...func(*Option)) (string, error) {
-	return j.generate(claims, j.config.Expire, opts...)
-}
-
-func (j *Jwt) GenerateRefreshToken(claims jwt.MapClaims, opts ...func(*Option)) (string, error) {
-	return j.generate(claims, j.config.RefreshExpire, opts...)
-}
-
-// jwt.MapClaims is a type alias for map[string]any
-// Numeric values are converted to float64 during JSON unmarshalling
-func (j *Jwt) Parse(tokenString string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+// Parse parses a JWT token and populates the provided claims struct
+func (j *JWT) Parse(tokenString string, claims jwt.Claims) error {
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.config.Secret), nil
 	})
+
 	if err != nil {
-		return nil, err
+		return err
 	}
+
 	if !token.Valid {
-		return nil, jwt.ErrTokenNotValidYet
+		return jwt.ErrTokenNotValidYet
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, jwt.ErrTokenInvalidClaims
-	}
-
-	return claims, nil
+	return nil
 }
 
-func (j *Jwt) Refresh(tokenString string, opts ...func(*Option)) (string, error) {
-	claims, err := j.Parse(tokenString)
+// Validate validates a JWT token without parsing claims
+func (j *JWT) Validate(tokenString string) error {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(j.config.Secret), nil
+	})
+
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return j.Generate(claims, opts...)
+	if !token.Valid {
+		return jwt.ErrTokenNotValidYet
+	}
+
+	return nil
+}
+
+// GetJTI extracts JTI from claims
+func (j *JWT) GetJTI(claims jwt.Claims) (string, error) {
+	v := reflect.ValueOf(claims)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return "", errors.New("claims must be a struct")
+	}
+
+	// Find RegisteredClaims field
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if field.Type() == reflect.TypeOf(jwt.RegisteredClaims{}) {
+			registeredClaims := field.Interface().(jwt.RegisteredClaims)
+			return registeredClaims.ID, nil
+		}
+	}
+
+	return "", errors.New("claims struct must embed jwt.RegisteredClaims")
+}
+
+// setStandardClaims sets the standard JWT claims if they are not already set
+func (j *JWT) setStandardClaims(claims jwt.Claims, expire int64) error {
+	// Use reflection to access RegisteredClaims
+	v := reflect.ValueOf(claims)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return errors.New("claims must be a struct")
+	}
+
+	// Find RegisteredClaims field
+	var registeredClaims *jwt.RegisteredClaims
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if field.Type() == reflect.TypeOf(jwt.RegisteredClaims{}) {
+			if field.CanAddr() {
+				registeredClaims = field.Addr().Interface().(*jwt.RegisteredClaims)
+				break
+			}
+		}
+	}
+
+	if registeredClaims == nil {
+		return errors.New("claims struct must embed jwt.RegisteredClaims")
+	}
+
+	now := time.Now()
+
+	// Set expiration time
+	if registeredClaims.ExpiresAt == nil {
+		registeredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(time.Duration(expire) * time.Second))
+	}
+
+	// Set issued at time
+	if registeredClaims.IssuedAt == nil {
+		if j.config.IssuedAt != 0 {
+			registeredClaims.IssuedAt = jwt.NewNumericDate(now.Add(time.Duration(j.config.IssuedAt) * time.Second))
+		} else {
+			registeredClaims.IssuedAt = jwt.NewNumericDate(now)
+		}
+	}
+
+	// Set not before time
+	if registeredClaims.NotBefore == nil && j.config.NotBefore != 0 {
+		registeredClaims.NotBefore = jwt.NewNumericDate(now.Add(time.Duration(j.config.NotBefore) * time.Second))
+	}
+
+	// Set other standard claims if not already set and config values exist
+	if registeredClaims.Issuer == "" && j.config.Issuer != "" {
+		registeredClaims.Issuer = j.config.Issuer
+	}
+
+	if registeredClaims.Subject == "" && j.config.Subject != "" {
+		registeredClaims.Subject = j.config.Subject
+	}
+
+	if len(registeredClaims.Audience) == 0 && j.config.Audience != "" {
+		registeredClaims.Audience = []string{j.config.Audience}
+	}
+
+	return nil
+}
+
+// setJTI sets the JTI in the RegisteredClaims
+func (j *JWT) setJTI(claims jwt.Claims, jti string) error {
+	v := reflect.ValueOf(claims)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return errors.New("claims must be a struct")
+	}
+
+	// Find RegisteredClaims field
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if field.Type() == reflect.TypeOf(jwt.RegisteredClaims{}) {
+			if field.CanAddr() {
+				registeredClaims := field.Addr().Interface().(*jwt.RegisteredClaims)
+				registeredClaims.ID = jti
+				return nil
+			}
+		}
+	}
+
+	return errors.New("claims struct must embed jwt.RegisteredClaims")
+}
+
+// ParseClaims is a generic function to parse token into any claims struct
+func ParseClaims[T jwt.Claims](j *JWT, tokenString string, claims T) (T, error) {
+	err := j.Parse(tokenString, claims)
+	return claims, err
 }

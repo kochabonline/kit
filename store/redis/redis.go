@@ -2,104 +2,217 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"runtime"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
+var (
+	ErrUnsupportedClientType = errors.New("unsupported redis client type")
+	ErrClientNotInitialized  = errors.New("redis client not initialized")
+)
+
+// Single Redis 单机客户端包装器
 type Single struct {
 	Client *redis.Client
-	config *Config
+	config *SingleConfig
 }
 
+// Cluster Redis 集群客户端包装器
 type Cluster struct {
 	Client *redis.ClusterClient
 	config *ClusterConfig
 }
 
+// SingleOption 单机客户端配置选项函数类型
 type SingleOption func(*Single)
 
-func NewClient(c *Config, opts ...SingleOption) (*Single, error) {
+// ClusterOption 集群客户端配置选项函数类型
+type ClusterOption func(*Cluster)
+
+// NewClient 创建新的单机 Redis 客户端
+func NewClient(config *SingleConfig, opts ...SingleOption) (*Single, error) {
 	s := &Single{
-		config: c,
+		config: config,
 	}
 
-	if err := s.config.init(); err != nil {
+	// 初始化配置
+	if err := s.config.Init(); err != nil {
 		return nil, err
 	}
 
+	// 应用选项
 	for _, opt := range opts {
-		opt(s)
+		if opt != nil {
+			opt(s)
+		}
 	}
 
-	return s.newClient()
+	// 创建客户端
+	client, err := s.createClient()
+	if err != nil {
+		return nil, err
+	}
+	s.Client = client
+
+	// 测试连接
+	if err := s.Ping(context.Background()); err != nil {
+		// 如果连接失败，确保清理资源
+		_ = s.Close()
+		return nil, err
+	}
+
+	return s, nil
 }
 
-func (s *Single) newClient() (*Single, error) {
-	if s.config.PoolSize == 0 {
-		s.config.PoolSize = 10 * runtime.GOMAXPROCS(0)
+// createClient 创建单机 Redis 客户端
+func (s *Single) createClient() (*redis.Client, error) {
+	poolSize := s.config.GetPoolSize()
+	if poolSize == 0 {
+		poolSize = 10 * runtime.GOMAXPROCS(0)
 	}
 
-	s.Client = redis.NewClient(&redis.Options{
-		Addr:     s.config.Addr(),
-		Password: s.config.Password,
-		DB:       s.config.DB,
-		Protocol: s.config.Protocol,
-		PoolSize: s.config.PoolSize,
+	client := redis.NewClient(&redis.Options{
+		Addr:            s.config.Addr(),
+		Password:        s.config.GetPassword(),
+		DB:              s.config.DB,
+		Protocol:        s.config.GetProtocol(),
+		PoolSize:        poolSize,
+		DialTimeout:     time.Duration(s.config.DialTimeout) * time.Second,
+		ReadTimeout:     time.Duration(s.config.ReadTimeout) * time.Second,
+		WriteTimeout:    time.Duration(s.config.WriteTimeout) * time.Second,
+		MaxRetries:      s.config.MaxRetries,
+		MinRetryBackoff: time.Duration(s.config.MinRetryBackoff) * time.Millisecond,
+		MaxRetryBackoff: time.Duration(s.config.MaxRetryBackoff) * time.Millisecond,
+		PoolTimeout:     time.Duration(s.config.PoolTimeout) * time.Second,
+		ConnMaxIdleTime: time.Duration(s.config.IdleTimeout) * time.Second,
+		ConnMaxLifetime: time.Duration(s.config.MaxConnAge) * time.Second,
+		MinIdleConns:    s.config.MinIdleConns,
 	})
 
-	_, err := s.Client.Ping(context.Background()).Result()
-
-	return s, err
+	return client, nil
 }
 
+// Ping 测试单机 Redis 连接是否正常
+func (s *Single) Ping(ctx context.Context) error {
+	if s.Client == nil {
+		return ErrClientNotInitialized
+	}
+
+	_, err := s.Client.Ping(ctx).Result()
+	return err
+}
+
+// Close 关闭单机 Redis 连接
 func (s *Single) Close() error {
 	if s.Client == nil {
 		return nil
 	}
 
-	return s.Client.Close()
+	err := s.Client.Close()
+	s.Client = nil // 清空引用，避免重复关闭
+	return err
 }
 
-type ClusterOption func(*Cluster)
+// Stats 获取单机 Redis 连接池统计信息
+func (s *Single) Stats() *redis.PoolStats {
+	if s.Client == nil {
+		return nil
+	}
 
-func NewClusterClient(c *ClusterConfig, opts ...ClusterOption) (*Cluster, error) {
+	return s.Client.PoolStats()
+}
+
+// GetClient 获取单机 Redis 客户端实例
+func (s *Single) GetClient() *redis.Client {
+	return s.Client
+}
+
+// NewClusterClient 创建新的集群 Redis 客户端
+func NewClusterClient(config *ClusterConfig, opts ...ClusterOption) (*Cluster, error) {
 	cl := &Cluster{
-		config: c,
+		config: config,
 	}
 
-	if err := cl.config.init(); err != nil {
-		return cl, err
+	// 初始化配置
+	if err := cl.config.Init(); err != nil {
+		return nil, err
 	}
 
+	// 应用选项
 	for _, opt := range opts {
-		opt(cl)
+		if opt != nil {
+			opt(cl)
+		}
 	}
 
-	return cl.newClusterClient()
+	// 创建客户端
+	client, err := cl.createClusterClient()
+	if err != nil {
+		return nil, err
+	}
+	cl.Client = client
+
+	// 测试连接
+	if err := cl.Ping(context.Background()); err != nil {
+		// 如果连接失败，确保清理资源
+		_ = cl.Close()
+		return nil, err
+	}
+
+	return cl, nil
 }
 
-func (cl *Cluster) newClusterClient() (*Cluster, error) {
-	if cl.config.PoolSize == 0 {
-		cl.config.PoolSize = 10 * runtime.GOMAXPROCS(0)
+// createClusterClient 创建集群 Redis 客户端
+func (cl *Cluster) createClusterClient() (*redis.ClusterClient, error) {
+	poolSize := cl.config.GetPoolSize()
+	if poolSize == 0 {
+		poolSize = 10 * runtime.GOMAXPROCS(0)
 	}
 
-	cl.Client = redis.NewClusterClient(&redis.ClusterOptions{
+	client := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:    cl.config.Addrs,
-		Password: cl.config.Password,
-		Protocol: cl.config.Protocol,
-		PoolSize: cl.config.PoolSize,
+		Password: cl.config.GetPassword(),
+		Protocol: cl.config.GetProtocol(),
+		PoolSize: poolSize,
 	})
 
-	_, err := cl.Client.Ping(context.Background()).Result()
-
-	return cl, err
+	return client, nil
 }
 
+// Ping 测试集群 Redis 连接是否正常
+func (cl *Cluster) Ping(ctx context.Context) error {
+	if cl.Client == nil {
+		return ErrClientNotInitialized
+	}
+
+	_, err := cl.Client.Ping(ctx).Result()
+	return err
+}
+
+// Close 关闭集群 Redis 连接
 func (cl *Cluster) Close() error {
 	if cl.Client == nil {
 		return nil
 	}
 
-	return cl.Client.Close()
+	err := cl.Client.Close()
+	cl.Client = nil // 清空引用，避免重复关闭
+	return err
+}
+
+// Stats 获取集群 Redis 连接池统计信息
+func (cl *Cluster) Stats() *redis.PoolStats {
+	if cl.Client == nil {
+		return nil
+	}
+
+	return cl.Client.PoolStats()
+}
+
+// GetClient 获取集群 Redis 客户端实例
+func (cl *Cluster) GetClient() *redis.ClusterClient {
+	return cl.Client
 }

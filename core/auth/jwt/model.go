@@ -5,8 +5,9 @@ import (
 	"github.com/kochabonline/kit/core/reflect"
 )
 
+// Config holds JWT configuration
 type Config struct {
-	Secret        string `json:"secret" default:"73c9e9e1-e606-4ed5-bceb-840a3d93c152"`
+	Secret        string `json:"secret" default:"jwt"`
 	SigningMethod string `json:"signingMethod" default:"HS256"`
 	Expire        int64  `json:"expire" default:"3600"`          // 3600 seconds
 	RefreshExpire int64  `json:"refreshExpire" default:"604800"` // 7 days
