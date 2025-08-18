@@ -47,7 +47,7 @@ upgrade: ## 升级项目依赖
 ## Code Generation
 proto: ## 生成 gRPC 代码
 	@if find . -name "*.proto" -type f -print -quit | grep -q .; then \
-		@echo "$(BLUE)生成 gRPC 代码...$(NC)"; \
+		echo "$(BLUE)生成 gRPC 代码...$(NC)"; \
 		protoc -I=. -I=../.. --go_out=. --go_opt=module=${PKG} --go-grpc_out=. --go-grpc_opt=module=${PKG} */*.proto && \
 		protoc-go-inject-tag -input="*/*.pb.go" && \
 		go fmt ./... && \
@@ -58,7 +58,7 @@ proto: ## 生成 gRPC 代码
 
 wire: ## 生成 Wire 依赖注入代码
 	@if find . -name "wire.go" -type f -print -quit | grep -q .; then \
-		@echo "$(BLUE)生成 Wire 代码...$(NC)"; \
+		echo "$(BLUE)生成 Wire 代码...$(NC)"; \
 		wire ./... && echo "$(GREEN)✓ Wire 代码生成完成$(NC)"; \
 	else \
 		echo "$(YELLOW)⚠ 未发现 wire.go 文件，跳过代码生成$(NC)"; \
@@ -66,7 +66,7 @@ wire: ## 生成 Wire 依赖注入代码
 
 swag: ## 生成 Swagger 文档
 	@if find . -name "main.go" -type f -print -quit | grep -q .; then \
-		@echo "$(BLUE)生成 Swagger 文档...$(NC)"; \
+		echo "$(BLUE)生成 Swagger 文档...$(NC)"; \
 		swag init && echo "$(GREEN)✓ Swagger 文档生成完成$(NC)"; \
 	else \
 		echo "$(YELLOW)⚠ 未发现 main.go 文件，跳过 Swagger 文档生成$(NC)"; \
