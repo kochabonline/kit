@@ -82,9 +82,6 @@ func NewServer(addr string, handler http.Handler, opts ...Option) *Server {
 }
 
 func (s *Server) Run() error {
-	if s.server == nil {
-		return http.ErrServerClosed
-	}
 	if s.meta.Name == "" {
 		s.meta.Name = defaultName
 	}
@@ -99,10 +96,6 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	if s.server == nil {
-		return http.ErrServerClosed
-	}
-
 	return s.server.Shutdown(ctx)
 }
 
