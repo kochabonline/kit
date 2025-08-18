@@ -33,7 +33,7 @@ func bindValidate(c *gin.Context, obj any, bindFunc func(any) error) error {
 	// 获取语言设置并进行验证
 	language := c.GetHeader(GetLanguageHeader())
 	if err := StructTrans(obj, language); err != nil {
-		return errors.BadRequest(err.Error())
+		return errors.BadRequest("%s", err.Error())
 	}
 
 	return nil
