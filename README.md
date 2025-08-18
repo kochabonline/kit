@@ -204,7 +204,7 @@ jwtManager := jwt.New(jwt.Config{
     Expire: time.Hour * 24,
 })
 
-token, err := jwtManager.GenerateToken("user123", map[string]interface{}{
+token, err := jwtManager.GenerateToken("user123", map[string]any{
     "role": "admin",
 })
 ```

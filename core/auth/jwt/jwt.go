@@ -60,7 +60,7 @@ func (j *JWT) generate(claims jwt.Claims, expire int64) (string, error) {
 
 // Parse parses a JWT token and populates the provided claims struct
 func (j *JWT) Parse(tokenString string, claims jwt.Claims) error {
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 		return []byte(j.config.Secret), nil
 	})
 
@@ -77,7 +77,7 @@ func (j *JWT) Parse(tokenString string, claims jwt.Claims) error {
 
 // Validate validates a JWT token without parsing claims
 func (j *JWT) Validate(tokenString string) error {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		return []byte(j.config.Secret), nil
 	})
 

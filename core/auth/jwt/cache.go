@@ -207,7 +207,7 @@ func (j *JwtCache) cacheTokens(ctx context.Context, userID int64, accessMeta, re
 		sessionID := fmt.Sprintf("%s_%d", accessMeta.DeviceID, accessMeta.CreatedAt)
 
 		// 使用Hash的嵌套结构存储access和refresh token
-		sessionData := map[string]interface{}{
+		sessionData := map[string]any{
 			"access_token":  string(accessMetaJSON),
 			"refresh_token": string(refreshMetaJSON),
 			"created_at":    accessMeta.CreatedAt,
@@ -305,7 +305,7 @@ func (j *JwtCache) GetUserTokenMetadata(ctx context.Context, userID int64) ([]To
 
 		var metadata []TokenMetadata
 		for _, sessionData := range sessions {
-			var session map[string]interface{}
+			var session map[string]any
 			if err := json.Unmarshal([]byte(sessionData), &session); err != nil {
 				continue
 			}
@@ -461,7 +461,7 @@ func (j *JwtCache) enforceMaxDevicesLimit(ctx context.Context, userID int64, new
 	// 统计不同设备的数量
 	deviceSessions := make(map[string][]string) // deviceID -> sessionIDs
 	for sessionID, sessionData := range sessions {
-		var session map[string]interface{}
+		var session map[string]any
 		if err := json.Unmarshal([]byte(sessionData), &session); err != nil {
 			continue
 		}
@@ -486,7 +486,7 @@ func (j *JwtCache) enforceMaxDevicesLimit(ctx context.Context, userID int64, new
 		for deviceID, sessionIDs := range deviceSessions {
 			for _, sessionID := range sessionIDs {
 				sessionData := sessions[sessionID]
-				var session map[string]interface{}
+				var session map[string]any
 				if err := json.Unmarshal([]byte(sessionData), &session); err != nil {
 					continue
 				}
@@ -523,7 +523,7 @@ func (j *JwtCache) removeDeviceSessions(ctx context.Context, userID int64, devic
 			continue
 		}
 
-		var session map[string]interface{}
+		var session map[string]any
 		if err := json.Unmarshal([]byte(sessionData), &session); err != nil {
 			continue
 		}
@@ -571,7 +571,7 @@ func (j *JwtCache) GetActiveDevicesCount(ctx context.Context, userID int64) (int
 
 	deviceSet := make(map[string]bool)
 	for _, sessionData := range sessions {
-		var session map[string]interface{}
+		var session map[string]any
 		if err := json.Unmarshal([]byte(sessionData), &session); err != nil {
 			continue
 		}
