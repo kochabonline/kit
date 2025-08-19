@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kochabonline/kit/core/util"
 	"github.com/kochabonline/kit/errors"
-	"github.com/kochabonline/kit/log"
+	klog "github.com/kochabonline/kit/log"
 )
 
 var (
@@ -15,11 +15,11 @@ var (
 )
 
 var (
-	mlog = log.New()
+	log = klog.New()
 )
 
-func SetLogger(logger *log.Logger) {
-	mlog = logger
+func SetLogger(logger *klog.Logger) {
+	log = logger
 }
 
 func skippedPathPrefixes(c *gin.Context, prefixes ...string) bool {

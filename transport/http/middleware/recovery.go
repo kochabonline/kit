@@ -30,7 +30,7 @@ func GinRecoveryWithConfig(config RecoveryConfig) gin.HandlerFunc {
 				brokenPipe := isBrokenPipe(err)
 
 				if brokenPipe {
-					mlog.Error().AnErr("recovery", err.(error)).Bytes("request", httpRequest).Msg("broken pipe error")
+					log.Error().AnErr("recovery", err.(error)).Bytes("request", httpRequest).Msg("broken pipe error")
 					// If the connection is dead, we can't write a status to it.
 					_ = c.Error(err.(error)) // nolint: err check
 					c.Abort()
@@ -38,9 +38,9 @@ func GinRecoveryWithConfig(config RecoveryConfig) gin.HandlerFunc {
 				}
 
 				if config.Stack {
-					mlog.Error().AnErr("recovery", err.(error)).Bytes("request", httpRequest).Msg("recovered from panic")
+					log.Error().AnErr("recovery", err.(error)).Bytes("request", httpRequest).Msg("recovered from panic")
 				} else {
-					mlog.Error().AnErr("recovery", err.(error)).Bytes("request", httpRequest).Msg("recovered from panic")
+					log.Error().AnErr("recovery", err.(error)).Bytes("request", httpRequest).Msg("recovered from panic")
 				}
 				c.AbortWithStatus(http.StatusInternalServerError)
 			}

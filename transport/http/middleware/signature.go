@@ -14,11 +14,11 @@ import (
 )
 
 type SignatureConfig struct {
-	Secret       string
-	EnableParams bool
-	EnableBody   bool
-	EnablePath   bool
-	EnableMethod bool
+	Secret        string
+	ParamsEnabled bool
+	BodyEnabled   bool
+	PathEnabled   bool
+	MethodEnabled bool
 }
 
 func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
@@ -26,7 +26,7 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		// Get the signature from the header
 		header := c.GetHeader("Signature")
 		if header == "" {
-			mlog.Error().Msg("signature header is missing")
+			log.Error().Msg("signature header is missing")
 			response.GinJSONError(c, ErrorSignature)
 			return
 		}
@@ -34,7 +34,7 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		var toCompute strings.Builder
 
 		// Get the parameters from the query string
-		if config.EnableParams {
+		if config.ParamsEnabled {
 			var paramsString string
 			params := c.Request.URL.Query()
 			if len(params) > 0 {
@@ -53,10 +53,10 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		}
 
 		// Get the raw data from the request body
-		if config.EnableBody {
+		if config.BodyEnabled {
 			body, err := c.GetRawData()
 			if err != nil {
-				mlog.Error().Err(err).Msg("signature get raw data")
+				log.Error().Err(err).Msg("signature get raw data")
 				response.GinJSONError(c, ErrorSignature)
 				return
 			}
@@ -65,19 +65,19 @@ func SignatureWithConfig(config SignatureConfig) gin.HandlerFunc {
 		}
 
 		// Get the request path
-		if config.EnablePath {
+		if config.PathEnabled {
 			toCompute.WriteString(c.Request.URL.Path)
 		}
 
 		// Get the request method
-		if config.EnableMethod {
+		if config.MethodEnabled {
 			toCompute.WriteString(c.Request.Method)
 		}
 
 		// Compute the signature
 		signature := computeHMACSHA256(config.Secret, toCompute.String())
 		if signature != header {
-			mlog.Error().Msg("verify signature failed")
+			log.Error().Msg("verify signature failed")
 			response.GinJSONError(c, ErrorSignature)
 			return
 		}
