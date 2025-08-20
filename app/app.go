@@ -250,6 +250,10 @@ func (app *Application) Start() error {
 			app.cancel()
 			return nil
 		case <-egCtx.Done():
+			// context.Canceled 是正常的关闭，不应该作为错误返回
+			if egCtx.Err() == context.Canceled {
+				return nil
+			}
 			return egCtx.Err()
 		}
 	})
@@ -265,15 +269,13 @@ func (app *Application) Start() error {
 	// 等待关闭
 	err := eg.Wait()
 	if err != nil && err != context.Canceled {
-		log.Error().Err(err).Msg("application stopped with error")
-	} else {
-		log.Info().Msg("application stopped gracefully")
+		return err
 	}
 
 	// 执行清理函数
 	app.executeCleanup()
 
-	return err
+	return nil
 }
 
 // Stop 优雅地停止应用
