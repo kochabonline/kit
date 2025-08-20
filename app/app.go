@@ -263,6 +263,10 @@ func (app *Application) Start() error {
 	case <-startedCh:
 		log.Info().Msg("application started successfully")
 	case <-egCtx.Done():
+		// context.Canceled 是正常的关闭，不应该作为错误返回
+		if egCtx.Err() == context.Canceled {
+			return nil
+		}
 		return egCtx.Err()
 	}
 
@@ -297,7 +301,6 @@ func (app *Application) startServers(eg *errgroup.Group, ctx context.Context, se
 			if err := server.Run(); err != nil {
 				// http.ErrServerClosed 是正常关闭时的预期错误，不应该记录为错误
 				if err != http.ErrServerClosed {
-					log.Error().Err(err).Any("server", server).Msg("server failed")
 					return err
 				}
 			}
@@ -312,7 +315,6 @@ func (app *Application) startServers(eg *errgroup.Group, ctx context.Context, se
 			defer cancel()
 
 			if err := server.Shutdown(shutdownCtx); err != nil {
-				log.Error().Err(err).Any("server", server).Msg("server shutdown failed")
 				return err
 			}
 
