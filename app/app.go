@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -287,15 +288,16 @@ func (app *Application) startServers(eg *errgroup.Group, ctx context.Context, se
 
 	// 在单独的协程中启动每个服务器
 	for _, server := range servers {
-		server := server
-
 		// 服务器运行器
 		eg.Go(func() error {
 			defer startWg.Done()
 
 			if err := server.Run(); err != nil {
-				log.Error().Err(err).Any("server", server).Msg("server failed")
-				return err
+				// http.ErrServerClosed 是正常关闭时的预期错误，不应该记录为错误
+				if err != http.ErrServerClosed {
+					log.Error().Err(err).Any("server", server).Msg("server failed")
+					return err
+				}
 			}
 			return nil
 		})
@@ -337,7 +339,6 @@ func (app *Application) executeCleanup() {
 	// 并发执行清理函数
 	eg := &errgroup.Group{}
 	for _, cleanup := range cleanupFns {
-		cleanup := cleanup
 		eg.Go(func() error {
 			return app.executeCleanupFunc(cleanup)
 		})
