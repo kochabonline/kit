@@ -38,11 +38,58 @@ type HealthChecker interface {
 	HealthCheck(ctx context.Context) error
 }
 
-// DependencyInjection is a composite interface for components in the IoC container.
-// It combines Component and Initializer interfaces for a complete dependency injection solution.
-type DependencyInjection interface {
+// Orderable defines components that have initialization/execution priority.
+// Lower values indicate higher priority (executed first).
+type Orderable interface {
+	// Order returns the order value for this component.
+	// Components with lower order values are processed first.
+	Order() int
+}
+
+// DependencyInjector defines a component that can resolve and inject dependencies.
+// This replaces reflection-based dependency injection with explicit name registration.
+type DependencyInjector interface {
+	// RegisterDependency registers a dependency provider for a specific component name.
+	RegisterDependency(name string, provider any) error
+
+	// ResolveDependency resolves a dependency by its component name.
+	ResolveDependency(name string) (any, error)
+
+	// InjectInto injects dependencies into a component.
+	InjectInto(component Component) error
+}
+
+// DependencyProvider defines components that can provide dependencies to other components.
+type DependencyProvider interface {
+	Component
+	// ProvidesDependency returns the component name this provider serves.
+	ProvidesDependency() string
+
+	// GetDependency returns the dependency instance.
+	GetDependency() any
+}
+
+// DependencyConsumer defines components that require dependencies from other components.
+type DependencyConsumer interface {
+	Component
+	// RequiredDependencies returns the component names of dependencies this component requires.
+	RequiredDependencies() []string
+
+	// SetDependency sets a dependency by its component name.
+	SetDependency(name string, dependency any) error
+}
+
+// BaseComponent represents a basic managed component.
+type BaseComponent interface {
 	Component
 	Initializer
+}
+
+// Repository represents a data access component.
+type Repository interface {
+	BaseComponent
+	// Close closes the repository and releases resources.
+	Close(ctx context.Context) error
 }
 
 // HTTPRouter defines components that register HTTP routes.
@@ -59,30 +106,4 @@ type GinRouter interface {
 	Component
 	// RegisterGinRoutes registers routes with a Gin router.
 	RegisterGinRoutes(r gin.IRouter) error
-}
-
-// Priority defines components that have initialization/execution priority.
-// Lower values indicate higher priority (executed first).
-type Priority interface {
-	// Priority returns the priority value for this component.
-	// Components with lower priority values are processed first.
-	Priority() int
-}
-
-// ConfigProvider defines components that provide configuration.
-// This enables components to share configuration in a type-safe way.
-type ConfigProvider interface {
-	Component
-	// GetConfig returns the configuration object.
-	// The returned value should be immutable or a copy to prevent external modifications.
-	GetConfig() any
-}
-
-// ServiceProvider defines components that provide services to other components.
-// This enables loose coupling between components.
-type ServiceProvider interface {
-	Component
-	// GetService returns a service by its type or name.
-	// Returns nil if the service is not available.
-	GetService(serviceType string) any
 }
