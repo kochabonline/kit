@@ -18,7 +18,6 @@ type Lifecycle struct {
 	componentStates    map[string]ComponentState
 	shutdownHandlers   []func() error
 	shutdownTimeout    time.Duration
-	verbose            bool
 }
 
 // LifecycleState represents the current state of the container.
