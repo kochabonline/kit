@@ -30,6 +30,12 @@ type Config struct {
 
 type Option func(*Config)
 
+func WithViper(v *viper.Viper) Option {
+	return func(c *Config) {
+		c.viper = v
+	}
+}
+
 func WithProvider(provider Provider) Option {
 	return func(c *Config) {
 		c.Provider = provider
