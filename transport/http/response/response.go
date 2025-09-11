@@ -90,7 +90,7 @@ func Error(err error) *Response {
 	}
 
 	e := errors.FromError(err)
-	return NewResponse(int(e.Code), nil, e.Message)
+	return NewResponse(e.Code, nil, e.Message)
 }
 
 // GinJSON 使用响应对象池写入成功的JSON响应
@@ -125,7 +125,7 @@ func GinJSONError(c *gin.Context, err error) {
 
 	e := errors.FromError(err)
 
-	resp.setError(int(e.Code), e.Message)
+	resp.setError(e.Code, e.Message)
 	c.JSON(http.StatusOK, resp)
 }
 

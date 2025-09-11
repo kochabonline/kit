@@ -41,7 +41,7 @@ type ComponentDescriptor struct {
 	Instance  Component
 	Order     int
 	Namespace string
-} 
+}
 
 // Store represents the IoC container with enhanced functionality.
 // It manages multiple namespaces and provides type-safe dependency injection without reflection.
@@ -124,7 +124,7 @@ func NewStore(opts ...StoreOption) *Store {
 }
 
 // logf logs a message if verbose logging is enabled.
-func (s *Store) logf(format string, args ...interface{}) {
+func (s *Store) logf(format string, args ...any) {
 	if s.verbose {
 		log.Infof(format, args...)
 	}

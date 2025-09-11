@@ -93,7 +93,7 @@ func NewLifecycle(store *Store, shutdownTimeout time.Duration) *Lifecycle {
 }
 
 // logf logs a message if verbose logging is enabled.
-func (lm *Lifecycle) logf(format string, args ...interface{}) {
+func (lm *Lifecycle) logf(format string, args ...any) {
 	if lm.store.verbose {
 		log.Infof(format, args...)
 	}
