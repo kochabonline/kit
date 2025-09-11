@@ -50,8 +50,8 @@ var translateFunc = func(ut ut.Translator, fe validator.FieldError) string {
 
 func TestStruct(t *testing.T) {
 	m := mock{
-		Name: "test",
-		Age:  17,
+		Name: "test user", // 满足 min=5 的要求
+		Age:  17,          // 满足 adultAge 的要求（>=18）
 	}
 	err := Struct(m)
 	if err != nil {
@@ -63,13 +63,13 @@ func TestStruct(t *testing.T) {
 func TestBind(t *testing.T) {
 	var m mock
 
-	// mock request
-	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer([]byte(`{"name":"hello!","age":17}`)))
+	// mock request with valid data
+	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer([]byte(`{"name":"hello world!","age":15}`)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("Language", "en")
+	req.Header.Set("Accept-Language", "zh")
 
 	// mock context
 	w := httptest.NewRecorder()

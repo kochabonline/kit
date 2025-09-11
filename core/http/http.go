@@ -8,8 +8,6 @@ import (
 	"maps"
 	"net/http"
 	"sync"
-
-	"github.com/kochabonline/kit/errors"
 )
 
 const (
@@ -185,7 +183,7 @@ func (cli *Client) createJSONRequest(method, url string, body any) (*http.Reques
 	defer cli.putBuffer(buf)
 
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
-		return nil, errors.BadRequest("encode request body: %v", err)
+		return nil, err
 	}
 
 	return http.NewRequest(method, url, bytes.NewReader(buf.Bytes()))
@@ -220,7 +218,7 @@ func (cli *Client) processResponse(resp *http.Response, dest any) (*http.Respons
 	// Decode response if target is provided
 	if dest != nil {
 		if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
-			return nil, errors.BadRequest("decode response body: %v", err)
+			return nil, err
 		}
 	}
 
