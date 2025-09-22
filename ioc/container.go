@@ -2,6 +2,7 @@ package ioc
 
 import (
 	"context"
+	"maps"
 	"time"
 )
 
@@ -42,9 +43,7 @@ func NewContainerBuilder() *ContainerBuilder {
 
 // WithDefaultNamespaces adds the default namespaces to the builder.
 func (cb *ContainerBuilder) WithDefaultNamespaces() *ContainerBuilder {
-	for name, order := range DefaultNamespaceOrders {
-		cb.namespaces[name] = order
-	}
+	maps.Copy(cb.namespaces, DefaultNamespaceOrders)
 	return cb
 }
 
@@ -139,6 +138,16 @@ func WithApplicationHooks(hooks *LifecycleHooks) ApplicationContainerOption {
 type ApplicationContainer struct {
 	store     *Store
 	lifecycle *Lifecycle
+}
+
+// Ac is the global application container instance.
+var (
+	Ac *ApplicationContainer
+)
+
+// Initialize the global application container with default settings.
+func init() {
+	Ac = NewApplicationContainer()
 }
 
 // NewApplicationContainer creates a new application container with default configuration.

@@ -107,7 +107,7 @@ func (m *MockDependencyConsumer) GetInjected(typeID string) any {
 func TestStore(t *testing.T) {
 	// Create a new application container
 	container := NewApplicationContainer(WithApplicationVerbose())
-	
+
 	// Test component registration
 	mockConfig := NewMockComponent("mock-config")
 	if err := container.RegisterConfig(mockConfig); err != nil {
