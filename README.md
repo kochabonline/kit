@@ -106,17 +106,17 @@ func main() {
         
         // 配置关闭超时
         app.WithShutdownTimeout(30*time.Second),
-        app.WithCleanupTimeout(10*time.Second),
+        app.WithCancelTimeout(10*time.Second),
         
         // 添加资源清理函数
-        app.WithCleanup("database", func(ctx context.Context) error {
+        app.WithCancel("database", func(ctx context.Context) error {
             if db != nil {
                 return db.Close()
             }
             return nil
         }, 5*time.Second),
         
-        app.WithCleanup("cache", func(ctx context.Context) error {
+        app.WithCancel("cache", func(ctx context.Context) error {
             // 清理缓存逻辑
             return nil
         }, 3*time.Second),
@@ -165,9 +165,9 @@ func main() {
 | `WithServer` | 添加单个服务器 | - |
 | `WithServers` | 添加多个服务器 | - |
 | `WithShutdownTimeout` | 设置服务关闭超时时间 | `30s` |
-| `WithCleanupTimeout` | 设置清理函数默认超时时间 | `10s` |
+| `WithCancelTimeout` | 设置清理函数默认超时时间 | `10s` |
 | `WithSignals` | 设置自定义关闭信号 | `SIGINT, SIGTERM, SIGQUIT` |
-| `WithCleanup` | 添加资源清理函数 | - |
+| `WithCancel` | 添加资源清理函数 | - |
 
 #### 运行时管理
 
