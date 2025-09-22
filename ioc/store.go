@@ -572,9 +572,7 @@ func (s *Store) registerRoutersInNamespace(ns *Namespace, r gin.IRouter) error {
 	for _, descriptor := range components {
 		// Check if component implements GinRouter interface
 		if router, ok := descriptor.Instance.(GinRouter); ok {
-			if err := router.RegisterGinRoutes(r); err != nil {
-				return fmt.Errorf("failed to register routes for %s: %w", descriptor.Name, err)
-			}
+			router.RegisterGinRoutes(r)
 			routers = append(routers, descriptor.Name)
 		}
 	}

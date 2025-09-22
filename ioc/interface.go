@@ -97,7 +97,7 @@ type Repository interface {
 type HTTPRouter interface {
 	Component
 	// RegisterRoutes registers HTTP routes with the given router.
-	RegisterRoutes(router any) error
+	RegisterRoutes(router any)
 }
 
 // GinRouter defines Gin-specific router registration.
@@ -105,5 +105,5 @@ type HTTPRouter interface {
 type GinRouter interface {
 	Component
 	// RegisterGinRoutes registers routes with a Gin router.
-	RegisterGinRoutes(r gin.IRouter) error
+	RegisterGinRoutes(r gin.IRouter)
 }
