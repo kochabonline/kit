@@ -134,7 +134,7 @@ func main() {
     }
 
     // 运行时添加清理函数
-    if err := application.AddCleanup("metrics", func(ctx context.Context) error {
+    if err := application.RegisterCancel("metrics", func(ctx context.Context) error {
         // 清理指标收集器
         return nil
     }, 2*time.Second); err != nil {

@@ -19,7 +19,7 @@ import (
 // 默认配置值
 const (
 	DefaultShutdownTimeout = 30 * time.Second
-	DefaultCleanupTimeout  = 10 * time.Second
+	DefaultCancelTimeout   = 30 * time.Second
 )
 
 // 默认关闭信号
@@ -47,16 +47,16 @@ type Application struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	shutdownTimeout time.Duration
-	cleanupTimeout  time.Duration
 	signals         []os.Signal
 	servers         []transport.Server
-	cleanupFns      []CleanupFunc
+	cancelFuncs     []CancelFunc
+	cancelTimeout   time.Duration
 	mu              sync.RWMutex
 	started         bool
 }
 
-// CleanupFunc 具有可选超时的清理函数
-type CleanupFunc struct {
+// CancelFunc 具有可选超时的清理函数
+type CancelFunc struct {
 	Name    string
 	Fn      func(context.Context) error
 	Timeout time.Duration
@@ -66,10 +66,10 @@ type CleanupFunc struct {
 func New(options ...Option) *Application {
 	app := &Application{
 		shutdownTimeout: DefaultShutdownTimeout,
-		cleanupTimeout:  DefaultCleanupTimeout,
+		cancelTimeout:   DefaultCancelTimeout,
 		signals:         make([]os.Signal, len(DefaultSignals)),
 		servers:         make([]transport.Server, 0),
-		cleanupFns:      make([]CleanupFunc, 0),
+		cancelFuncs:     make([]CancelFunc, 0),
 	}
 
 	// 复制默认信号
@@ -104,11 +104,11 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 	})
 }
 
-// WithCleanupTimeout 设置清理函数的默认超时时间
-func WithCleanupTimeout(timeout time.Duration) Option {
+// WithCancelTimeout 设置清理函数的默认超时时间
+func WithCancelTimeout(timeout time.Duration) Option {
 	return optionFunc(func(app *Application) {
 		if timeout > 0 {
-			app.cleanupTimeout = timeout
+			app.cancelTimeout = timeout
 		}
 	})
 }
@@ -143,25 +143,25 @@ func WithServers(servers ...transport.Server) Option {
 	})
 }
 
-// WithCleanup 添加在关闭期间执行的清理函数
-func WithCleanup(name string, fn func(context.Context) error, timeout time.Duration) Option {
+// WithCancel 添加在关闭期间执行的清理函数
+func WithCancel(name string, fn func(context.Context) error, timeout time.Duration) Option {
 	return optionFunc(func(app *Application) {
 		if fn == nil {
-			log.Warn().Str("name", name).Msg("nil cleanup function ignored")
+			log.Warn().Str("name", name).Msg("nil cancel function ignored")
 			return
 		}
 
 		if timeout == 0 {
-			timeout = app.cleanupTimeout
+			timeout = app.cancelTimeout
 		}
 
-		cleanup := CleanupFunc{
+		cleanup := CancelFunc{
 			Name:    name,
 			Fn:      fn,
 			Timeout: timeout,
 		}
 
-		app.cleanupFns = append(app.cleanupFns, cleanup)
+		app.cancelFuncs = append(app.cancelFuncs, cleanup)
 	})
 }
 
@@ -184,26 +184,26 @@ func (app *Application) AddServer(server transport.Server) error {
 	return nil
 }
 
-// AddCleanup 在运行时向应用添加清理函数
-func (app *Application) AddCleanup(name string, fn func(context.Context) error, timeout time.Duration) error {
+// RegisterCancel 在运行时向应用添加清理函数
+func (app *Application) RegisterCancel(name string, fn func(context.Context) error, timeout time.Duration) error {
 	if fn == nil {
-		return errors.New("cleanup function cannot be nil")
+		return errors.New("cancel function cannot be nil")
 	}
 
 	app.mu.Lock()
 	defer app.mu.Unlock()
 
 	if timeout == 0 {
-		timeout = app.cleanupTimeout
+		timeout = app.cancelTimeout
 	}
 
-	cleanup := CleanupFunc{
+	cancel := CancelFunc{
 		Name:    name,
 		Fn:      fn,
 		Timeout: timeout,
 	}
 
-	app.cleanupFns = append(app.cleanupFns, cleanup)
+	app.cancelFuncs = append(app.cancelFuncs, cancel)
 
 	return nil
 }
@@ -258,26 +258,15 @@ func (app *Application) Start() error {
 		}
 	})
 
-	// 等待服务器启动
-	select {
-	case <-startedCh:
-		log.Info().Msg("application started successfully")
-	case <-egCtx.Done():
-		// context.Canceled 是正常的关闭，不应该作为错误返回
-		if egCtx.Err() == context.Canceled {
-			return nil
-		}
-		return egCtx.Err()
-	}
-
 	// 等待关闭
 	err := eg.Wait()
+
+	// 如果有错误且不是正常的取消错误，则返回错误
 	if err != nil && err != context.Canceled {
 		return err
 	}
 
-	// 执行清理函数
-	app.executeCleanup()
+	app.runCleanupTasks()
 
 	return nil
 }
@@ -329,22 +318,23 @@ func (app *Application) startServers(eg *errgroup.Group, ctx context.Context, se
 	}()
 }
 
-// executeCleanup 执行所有清理函数
-func (app *Application) executeCleanup() {
+// runCleanupTasks 执行所有清理函数
+func (app *Application) runCleanupTasks() {
 	app.mu.RLock()
-	cleanupFns := make([]CleanupFunc, len(app.cleanupFns))
-	copy(cleanupFns, app.cleanupFns)
+	cancelFuncs := make([]CancelFunc, len(app.cancelFuncs))
+	copy(cancelFuncs, app.cancelFuncs)
 	app.mu.RUnlock()
 
-	if len(cleanupFns) == 0 {
+	if len(cancelFuncs) == 0 {
 		return
 	}
 
 	// 并发执行清理函数
 	eg := &errgroup.Group{}
-	for _, cleanup := range cleanupFns {
+	for _, cancel := range cancelFuncs {
+		cancel := cancel
 		eg.Go(func() error {
-			return app.executeCleanupFunc(cleanup)
+			return app.runCleanupTask(cancel)
 		})
 	}
 
@@ -353,8 +343,8 @@ func (app *Application) executeCleanup() {
 	}
 }
 
-// executeCleanupFunc 执行单个带超时的清理函数
-func (app *Application) executeCleanupFunc(cleanup CleanupFunc) error {
+// runCleanupTask 执行单个带超时的清理函数
+func (app *Application) runCleanupTask(cleanup CancelFunc) error {
 	ctx, cancel := context.WithTimeout(context.Background(), cleanup.Timeout)
 	defer cancel()
 
@@ -389,7 +379,7 @@ func (app *Application) Info() ApplicationInfo {
 	return ApplicationInfo{
 		Started:      app.started,
 		ServerCount:  len(app.servers),
-		CleanupCount: len(app.cleanupFns),
+		CleanupCount: len(app.cancelFuncs),
 	}
 }
 
@@ -410,7 +400,7 @@ func WithServerHealthCheck(server transport.Server, healthCheck func() error) Op
 
 			// 添加健康检查作为清理函数
 			if healthCheck != nil {
-				app.cleanupFns = append(app.cleanupFns, CleanupFunc{
+				app.cancelFuncs = append(app.cancelFuncs, CancelFunc{
 					Name: "health-check",
 					Fn: func(ctx context.Context) error {
 						return healthCheck()
@@ -426,12 +416,12 @@ func WithServerHealthCheck(server transport.Server, healthCheck func() error) Op
 func WithGracefulShutdown(preShutdownHook func() error) Option {
 	return optionFunc(func(app *Application) {
 		if preShutdownHook != nil {
-			app.cleanupFns = append(app.cleanupFns, CleanupFunc{
+			app.cancelFuncs = append(app.cancelFuncs, CancelFunc{
 				Name: "pre-shutdown-hook",
 				Fn: func(ctx context.Context) error {
 					return preShutdownHook()
 				},
-				Timeout: app.cleanupTimeout,
+				Timeout: app.cancelTimeout,
 			})
 		}
 	})
@@ -442,7 +432,7 @@ func WithStartupValidation(validator func() error) Option {
 	return optionFunc(func(app *Application) {
 		if validator != nil {
 			// 添加验证作为特殊的清理函数，优先运行
-			validation := CleanupFunc{
+			validation := CancelFunc{
 				Name: "startup-validation",
 				Fn: func(ctx context.Context) error {
 					return validator()
@@ -451,7 +441,7 @@ func WithStartupValidation(validator func() error) Option {
 			}
 
 			// 插入到开头
-			app.cleanupFns = append([]CleanupFunc{validation}, app.cleanupFns...)
+			app.cancelFuncs = append([]CancelFunc{validation}, app.cancelFuncs...)
 		}
 	})
 }

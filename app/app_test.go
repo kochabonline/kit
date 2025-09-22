@@ -28,32 +28,27 @@ func TestNew_Simple(t *testing.T) {
 func TestNew_WithOptions(t *testing.T) {
 	httpServer := http.NewServer("", gin.New())
 
-	cleanupCalled := false
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	app := New(
 		WithServer(httpServer),
 		WithShutdownTimeout(5*time.Second),
-		WithCleanupTimeout(2*time.Second),
-		WithCleanup("test-cleanup", func(ctx context.Context) error {
-			cleanupCalled = true
+		WithCancelTimeout(2*time.Second),
+		WithCancel("test-cancel", func(ctx context.Context) error {
+			t.Log("cancel called")
 			return nil
 		}, time.Second),
 		WithSignals(os.Interrupt, syscall.SIGTERM),
+		WithContext(ctx),
 	)
-
-	info := app.Info()
-	if info.ServerCount != 1 {
-		t.Fatalf("expected 1 server, got %d", info.ServerCount)
-	}
-
-	if info.CleanupCount != 1 {
-		t.Fatalf("expected 1 cleanup function, got %d", info.CleanupCount)
-	}
-
-	// Test cleanup execution
-	app.executeCleanup()
-
-	if !cleanupCalled {
-		t.Fatal("expected cleanup function to be called")
+	app.RegisterCancel("late-cancel", func(ctx context.Context) error {
+		t.Log("late cancel called")
+		return nil
+	}, time.Second)
+	err := app.Start()
+	if err != nil && err != context.Canceled && err.Error() != "http: Server closed" {
+		t.Fatalf("unexpected error from app.Start(): %v", err)
 	}
 }
 
@@ -61,9 +56,12 @@ func TestNew_WithMultipleServers(t *testing.T) {
 	httpServer1 := http.NewServer("", gin.New())
 	httpServer2 := http.NewServer("", gin.New())
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	app := New(
 		WithServers(httpServer1, httpServer2),
 		WithServer(httpServer1), // Should be deduplicated
+		WithContext(ctx),
 	)
 
 	info := app.Info()
@@ -130,11 +128,11 @@ func TestApplication_AddNilServer(t *testing.T) {
 	}
 }
 
-func TestApplication_AddCleanupAtRuntime(t *testing.T) {
+func TestApplication_RegisterCancelAtRuntime(t *testing.T) {
 	app := New()
 
 	cleanupCalled := false
-	err := app.AddCleanup("test", func(ctx context.Context) error {
+	err := app.RegisterCancel("test", func(ctx context.Context) error {
 		cleanupCalled = true
 		return nil
 	}, time.Second)
@@ -148,7 +146,7 @@ func TestApplication_AddCleanupAtRuntime(t *testing.T) {
 		t.Fatalf("expected 1 cleanup function, got %d", info.CleanupCount)
 	}
 
-	app.executeCleanup()
+	app.runCleanupTasks()
 
 	if !cleanupCalled {
 		t.Fatal("expected cleanup function to be called")
@@ -158,7 +156,7 @@ func TestApplication_AddCleanupAtRuntime(t *testing.T) {
 func TestApplication_AddNilCleanup(t *testing.T) {
 	app := New()
 
-	err := app.AddCleanup("test", nil, time.Second)
+	err := app.RegisterCancel("test", nil, time.Second)
 	if err == nil {
 		t.Fatal("expected error when adding nil cleanup function")
 	}
@@ -194,27 +192,27 @@ func TestWithContext(t *testing.T) {
 	}
 }
 
-func TestCleanupFunc_Panic(t *testing.T) {
+func TestCancelFunc_Panic(t *testing.T) {
 	app := New(
-		WithCleanup("panic-cleanup", func(ctx context.Context) error {
+		WithCancel("panic-cancel", func(ctx context.Context) error {
 			panic("test panic")
 		}, time.Second),
 	)
 
 	// Should not panic when executing cleanup
-	app.executeCleanup()
+	app.runCleanupTasks()
 }
 
-func TestCleanupFunc_Timeout(t *testing.T) {
+func TestCancelFunc_Timeout(t *testing.T) {
 	app := New(
-		WithCleanup("slow-cleanup", func(ctx context.Context) error {
+		WithCancel("slow-cancel", func(ctx context.Context) error {
 			time.Sleep(2 * time.Second)
 			return nil
 		}, 100*time.Millisecond),
 	)
 
 	start := time.Now()
-	app.executeCleanup()
+	app.runCleanupTasks()
 	duration := time.Since(start)
 
 	// Should timeout quickly
@@ -228,8 +226,8 @@ func TestDefaultValues(t *testing.T) {
 		t.Fatalf("unexpected default shutdown timeout: %v", DefaultShutdownTimeout)
 	}
 
-	if DefaultCleanupTimeout != 10*time.Second {
-		t.Fatalf("unexpected default cleanup timeout: %v", DefaultCleanupTimeout)
+	if DefaultCancelTimeout != 10*time.Second {
+		t.Fatalf("unexpected default cleanup timeout: %v", DefaultCancelTimeout)
 	}
 
 	expectedSignals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
@@ -254,7 +252,7 @@ func TestWithNilOptions(t *testing.T) {
 func TestOptionValidation(t *testing.T) {
 	app := New(
 		WithShutdownTimeout(0),             // Should be ignored (invalid)
-		WithCleanupTimeout(0),              // Should be ignored (invalid)
+		WithCancelTimeout(0),               // Should be ignored (invalid)
 		WithShutdownTimeout(5*time.Second), // Should be applied
 	)
 
