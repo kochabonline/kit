@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// URLBuilder 高性能URL构建器
 // 提供链式调用API用于构建复杂URL
 type URLBuilder struct {
 	scheme   string

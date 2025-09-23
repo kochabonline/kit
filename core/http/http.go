@@ -16,7 +16,7 @@ const (
 	MethodHead    = "HEAD"
 	MethodPost    = "POST"
 	MethodPut     = "PUT"
-	MethodPatch   = "PATCH" // RFC 5789
+	MethodPatch   = "PATCH"
 	MethodDelete  = "DELETE"
 	MethodConnect = "CONNECT"
 	MethodOptions = "OPTIONS"
