@@ -62,14 +62,16 @@ func (b *URLBuilder) Host(host string) *URLBuilder {
 
 // Port 设置端口号
 func (b *URLBuilder) Port(port string) *URLBuilder {
-	b.port = port
+	if port != "" && port != "0" {
+		b.port = port
+	}
 	return b
 }
 
 // Path 设置完整路径，会覆盖之前的路径
 func (b *URLBuilder) Path(path string) *URLBuilder {
-	b.path.Reset()
 	if path != "" {
+		b.path.Reset()
 		b.path.WriteString(path)
 	}
 	return b

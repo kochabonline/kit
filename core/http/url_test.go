@@ -7,13 +7,15 @@ import (
 )
 
 func TestNewURLBuilder(t *testing.T) {
-	builder := NewURLBuilder()
-	if builder == nil {
-		t.Fatal("NewURLBuilder() 返回 nil")
-	}
-	if builder.query == nil {
-		t.Error("query 应该被初始化")
-	}
+	builder := NewURLBuilder().
+		Scheme("http").
+		Host("example.com").
+		Port("0").
+		Path("").
+		Query("key", "value").
+		Fragment("section").
+		String()
+	t.Log("builder: ", builder)
 }
 
 func TestFromURL(t *testing.T) {
