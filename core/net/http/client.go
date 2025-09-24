@@ -11,25 +11,6 @@ import (
 )
 
 const (
-	// HTTP methods
-	MethodGet     = "GET"
-	MethodHead    = "HEAD"
-	MethodPost    = "POST"
-	MethodPut     = "PUT"
-	MethodPatch   = "PATCH"
-	MethodDelete  = "DELETE"
-	MethodConnect = "CONNECT"
-	MethodOptions = "OPTIONS"
-	MethodTrace   = "TRACE"
-
-	// Content types
-	ContentTypeJSON = "application/json"
-	ContentTypeForm = "application/x-www-form-urlencoded"
-	ContentTypeXML  = "application/xml"
-	ContentTypeText = "text/plain"
-)
-
-const (
 	// Buffer pool constants
 	defaultBufferSize = 4096
 	maxBufferSize     = 1024 * 1024 // 1MB
