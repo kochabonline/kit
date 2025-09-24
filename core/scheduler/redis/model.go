@@ -171,6 +171,17 @@ func (et EventType) String() string {
 	return string(et)
 }
 
+// MarshalBinary 实现 encoding.BinaryMarshaler 接口
+func (et EventType) MarshalBinary() ([]byte, error) {
+	return []byte(et), nil
+}
+
+// UnmarshalBinary 实现 encoding.BinaryUnmarshaler 接口
+func (et *EventType) UnmarshalBinary(data []byte) error {
+	*et = EventType(data)
+	return nil
+}
+
 // Task 任务定义
 type Task struct {
 	// 基本信息
@@ -252,14 +263,14 @@ type Worker struct {
 
 // SchedulerEvent 调度器事件
 type SchedulerEvent struct {
-	Type      EventType              `json:"type"`                // 事件类型
-	TaskID    string                 `json:"taskId,omitempty"`    // 任务ID
-	WorkerID  string                 `json:"workerId,omitempty"`  // 工作节点ID
-	NodeID    string                 `json:"nodeId,omitempty"`    // 调度器节点ID
-	Timestamp int64                  `json:"timestamp"`           // 事件时间戳
-	Data      map[string]interface{} `json:"data,omitempty"`      // 事件数据
-	Error     string                 `json:"error,omitempty"`     // 错误信息
-	Retryable bool                   `json:"retryable,omitempty"` // 是否可重试
+	Type      EventType      `json:"type"`                // 事件类型
+	TaskID    string         `json:"taskId,omitempty"`    // 任务ID
+	WorkerID  string         `json:"workerId,omitempty"`  // 工作节点ID
+	NodeID    string         `json:"nodeId,omitempty"`    // 调度器节点ID
+	Timestamp int64          `json:"timestamp"`           // 事件时间戳
+	Data      map[string]any `json:"data,omitempty"`      // 事件数据
+	Error     string         `json:"error,omitempty"`     // 错误信息
+	Retryable bool           `json:"retryable,omitempty"` // 是否可重试
 }
 
 // SchedulerMetrics 调度器指标

@@ -112,7 +112,7 @@ type LeaderElector interface {
 // PubSubManager Redis Pub/Sub管理器接口
 type PubSubManager interface {
 	// Publish 发布消息
-	Publish(ctx context.Context, channel string, message interface{}) error
+	Publish(ctx context.Context, channel string, message any) error
 
 	// Subscribe 订阅消息
 	Subscribe(ctx context.Context, channels ...string) <-chan *Message
@@ -127,7 +127,7 @@ type PubSubManager interface {
 // StreamManager Redis Stream管理器接口
 type StreamManager interface {
 	// AddMessage 添加消息到Stream
-	AddMessage(ctx context.Context, stream string, values map[string]interface{}) (string, error)
+	AddMessage(ctx context.Context, stream string, values map[string]any) (string, error)
 
 	// ReadGroup 消费者组读取消息
 	ReadGroup(ctx context.Context, group, consumer, stream, lastID string, count int64) ([]StreamMessage, error)

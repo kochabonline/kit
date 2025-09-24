@@ -149,7 +149,7 @@ func (s *redisScheduler) Start(ctx context.Context) error {
 		Type:      EventSchedulerStarted,
 		NodeID:    s.nodeID,
 		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"nodeId": s.nodeID,
 		},
 	})
@@ -174,7 +174,7 @@ func (s *redisScheduler) Stop(ctx context.Context) error {
 		Type:      EventSchedulerStopped,
 		NodeID:    s.nodeID,
 		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"nodeId": s.nodeID,
 		},
 	})
@@ -548,7 +548,7 @@ func (s *redisScheduler) handleLeaderElectionEvent(ctx context.Context, event Le
 				Type:      EventLeaderElected,
 				NodeID:    s.nodeID,
 				Timestamp: time.Now().Unix(),
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"nodeId": s.nodeID,
 					"term":   s.metrics.LeaderTerm,
 				},
@@ -566,7 +566,7 @@ func (s *redisScheduler) handleLeaderElectionEvent(ctx context.Context, event Le
 				Type:      EventLeaderLost,
 				NodeID:    s.nodeID,
 				Timestamp: time.Now().Unix(),
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"nodeId": s.nodeID,
 				},
 			})

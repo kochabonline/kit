@@ -103,8 +103,8 @@ func (em *EventManager) PublishEvent(ctx context.Context, event *SchedulerEvent)
 	pipe.Publish(ctx, em.keys.EventChannel, eventJSON)
 
 	// 2. 添加到Stream (持久化和可靠消费)
-	streamValues := map[string]interface{}{
-		"type":      event.Type,
+	streamValues := map[string]any{
+		"type":      string(event.Type),
 		"taskId":    event.TaskID,
 		"workerId":  event.WorkerID,
 		"nodeId":    event.NodeID,
@@ -141,7 +141,7 @@ func (em *EventManager) PublishTaskEvent(ctx context.Context, eventType EventTyp
 	if task != nil {
 		event.TaskID = task.ID
 		event.WorkerID = task.WorkerID
-		event.Data = map[string]interface{}{
+		event.Data = map[string]any{
 			"priority": task.Priority.String(),
 			"status":   task.Status.String(),
 		}
@@ -164,7 +164,7 @@ func (em *EventManager) PublishWorkerEvent(ctx context.Context, eventType EventT
 	// 添加工作节点相关的数据
 	if worker != nil {
 		event.WorkerID = worker.ID
-		event.Data = map[string]interface{}{
+		event.Data = map[string]any{
 			"address":      worker.Address,
 			"status":       worker.Status.String(),
 			"currentTasks": worker.CurrentTasks,
@@ -420,7 +420,7 @@ func NewRedisPubSubManager(client redis.UniversalClient) PubSubManager {
 }
 
 // Publish 发布消息
-func (p *redisPubSubManager) Publish(ctx context.Context, channel string, message interface{}) error {
+func (p *redisPubSubManager) Publish(ctx context.Context, channel string, message any) error {
 	var payload string
 
 	switch v := message.(type) {
@@ -510,7 +510,7 @@ func NewRedisStreamManager(client redis.Cmdable) StreamManager {
 }
 
 // AddMessage 添加消息到Stream
-func (s *redisStreamManager) AddMessage(ctx context.Context, stream string, values map[string]interface{}) (string, error) {
+func (s *redisStreamManager) AddMessage(ctx context.Context, stream string, values map[string]any) (string, error) {
 	result, err := s.client.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream,
 		Values: values,

@@ -473,7 +473,7 @@ func (m *RedisLockManager) IsLockHeld(key string) bool {
 func (m *RedisLockManager) Close(ctx context.Context) error {
 	lock := NewRedisLock(m.client)
 
-	m.locks.Range(func(key, value interface{}) bool {
+	m.locks.Range(func(key, value any) bool {
 		info := value.(*lockInfo)
 		info.mu.Lock()
 		defer info.mu.Unlock()

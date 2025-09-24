@@ -80,7 +80,7 @@ func (mc *MetricsCollector) collectAndSaveMetrics(ctx context.Context) {
 	pipe.HSet(ctx, mc.keys.MetricsHash, mc.nodeID, metricsJSON)
 
 	// 保存指标历史 (使用时间戳作为Stream ID)
-	streamValues := map[string]interface{}{
+	streamValues := map[string]any{
 		"nodeId":             mc.nodeID,
 		"timestamp":          time.Now().Unix(),
 		"pendingTasks":       metrics.PendingTasks,
@@ -410,13 +410,13 @@ type AlertNotifier interface {
 
 // Alert 告警信息
 type Alert struct {
-	RuleName    string                 `json:"ruleName"`
-	Severity    AlertSeverity          `json:"severity"`
-	Message     string                 `json:"message"`
-	Timestamp   int64                  `json:"timestamp"`
-	NodeID      string                 `json:"nodeId"`
-	Labels      map[string]string      `json:"labels"`
-	Annotations map[string]interface{} `json:"annotations"`
+	RuleName    string            `json:"ruleName"`
+	Severity    AlertSeverity     `json:"severity"`
+	Message     string            `json:"message"`
+	Timestamp   int64             `json:"timestamp"`
+	NodeID      string            `json:"nodeId"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]any    `json:"annotations"`
 }
 
 // NewAlertManager 创建告警管理器
@@ -453,7 +453,7 @@ func (am *AlertManager) EvaluateRules(metrics *SystemMetrics) []*Alert {
 					"nodeId":   metrics.NodeID,
 					"severity": string(rule.Severity),
 				},
-				Annotations: map[string]interface{}{
+				Annotations: map[string]any{
 					"threshold":    rule.Threshold,
 					"currentValue": am.getCurrentValue(rule, metrics),
 					"description":  rule.Description,
