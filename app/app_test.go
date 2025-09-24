@@ -34,16 +34,16 @@ func TestNew_WithOptions(t *testing.T) {
 	app := New(
 		WithServer(httpServer),
 		WithShutdownTimeout(5*time.Second),
-		WithCancelTimeout(2*time.Second),
-		WithCancel("test-cancel", func(ctx context.Context) error {
-			t.Log("cancel called")
+		WithCloseTimeout(2*time.Second),
+		WithClose("test-close", func(ctx context.Context) error {
+			t.Log("close called")
 			return nil
 		}, time.Second),
 		WithSignals(os.Interrupt, syscall.SIGTERM),
 		WithContext(ctx),
 	)
-	app.RegisterCancel("late-cancel", func(ctx context.Context) error {
-		t.Log("late cancel called")
+	app.RegisterClose("late-close", func(ctx context.Context) error {
+		t.Log("late close called")
 		return nil
 	}, time.Second)
 	err := app.Start()
@@ -128,37 +128,37 @@ func TestApplication_AddNilServer(t *testing.T) {
 	}
 }
 
-func TestApplication_RegisterCancelAtRuntime(t *testing.T) {
+func TestApplication_RegisterCloseAtRuntime(t *testing.T) {
 	app := New()
 
-	cleanupCalled := false
-	err := app.RegisterCancel("test", func(ctx context.Context) error {
-		cleanupCalled = true
+	closeCalled := false
+	err := app.RegisterClose("test", func(ctx context.Context) error {
+		closeCalled = true
 		return nil
 	}, time.Second)
 
 	if err != nil {
-		t.Fatalf("unexpected error adding cleanup: %v", err)
+		t.Fatalf("unexpected error adding close function: %v", err)
 	}
 
 	info := app.Info()
-	if info.CleanupCount != 1 {
-		t.Fatalf("expected 1 cleanup function, got %d", info.CleanupCount)
+	if info.CloseCount != 1 {
+		t.Fatalf("expected 1 close function, got %d", info.CloseCount)
 	}
 
-	app.runCleanupTasks()
+	app.runCloseTasks()
 
-	if !cleanupCalled {
-		t.Fatal("expected cleanup function to be called")
+	if !closeCalled {
+		t.Fatal("expected close function to be called")
 	}
 }
 
-func TestApplication_AddNilCleanup(t *testing.T) {
+func TestApplication_AddNilClose(t *testing.T) {
 	app := New()
 
-	err := app.RegisterCancel("test", nil, time.Second)
+	err := app.RegisterClose("test", nil, time.Second)
 	if err == nil {
-		t.Fatal("expected error when adding nil cleanup function")
+		t.Fatal("expected error when adding nil close function")
 	}
 }
 
@@ -192,32 +192,32 @@ func TestWithContext(t *testing.T) {
 	}
 }
 
-func TestCancelFunc_Panic(t *testing.T) {
+func TestCloseFunc_Panic(t *testing.T) {
 	app := New(
-		WithCancel("panic-cancel", func(ctx context.Context) error {
+		WithClose("panic-close", func(ctx context.Context) error {
 			panic("test panic")
 		}, time.Second),
 	)
 
-	// Should not panic when executing cleanup
-	app.runCleanupTasks()
+	// Should not panic when executing close tasks
+	app.runCloseTasks()
 }
 
-func TestCancelFunc_Timeout(t *testing.T) {
+func TestCloseFunc_Timeout(t *testing.T) {
 	app := New(
-		WithCancel("slow-cancel", func(ctx context.Context) error {
+		WithClose("slow-close", func(ctx context.Context) error {
 			time.Sleep(2 * time.Second)
 			return nil
 		}, 100*time.Millisecond),
 	)
 
 	start := time.Now()
-	app.runCleanupTasks()
+	app.runCloseTasks()
 	duration := time.Since(start)
 
 	// Should timeout quickly
 	if duration > 500*time.Millisecond {
-		t.Fatalf("cleanup took too long: %v", duration)
+		t.Fatalf("close tasks took too long: %v", duration)
 	}
 }
 
@@ -226,8 +226,8 @@ func TestDefaultValues(t *testing.T) {
 		t.Fatalf("unexpected default shutdown timeout: %v", DefaultShutdownTimeout)
 	}
 
-	if DefaultCancelTimeout != 10*time.Second {
-		t.Fatalf("unexpected default cleanup timeout: %v", DefaultCancelTimeout)
+	if DefaultCloseTimeout != 30*time.Second {
+		t.Fatalf("unexpected default close timeout: %v", DefaultCloseTimeout)
 	}
 
 	expectedSignals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
@@ -252,7 +252,7 @@ func TestWithNilOptions(t *testing.T) {
 func TestOptionValidation(t *testing.T) {
 	app := New(
 		WithShutdownTimeout(0),             // Should be ignored (invalid)
-		WithCancelTimeout(0),               // Should be ignored (invalid)
+		WithCloseTimeout(0),                // Should be ignored (invalid)
 		WithShutdownTimeout(5*time.Second), // Should be applied
 	)
 

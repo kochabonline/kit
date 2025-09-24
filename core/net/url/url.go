@@ -25,28 +25,6 @@ func NewURLBuilder() *URLBuilder {
 	}
 }
 
-// FromURL 从现有URL字符串创建构建器
-func FromURL(rawURL string) (*URLBuilder, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, fmt.Errorf("解析URL失败: %w", err)
-	}
-
-	builder := &URLBuilder{
-		scheme:   u.Scheme,
-		host:     u.Hostname(),
-		port:     u.Port(),
-		fragment: u.Fragment,
-		query:    u.Query(),
-	}
-
-	if u.Path != "" {
-		builder.path.WriteString(u.Path)
-	}
-
-	return builder, nil
-}
-
 // Scheme 设置URL协议 (http, https, ftp等)
 func (b *URLBuilder) Scheme(scheme string) *URLBuilder {
 	b.scheme = scheme
@@ -234,6 +212,28 @@ func BuildHTTP(host string, pathSegments ...string) *URLBuilder {
 // BuildHTTPS 快速构建HTTPS URL
 func BuildHTTPS(host string, pathSegments ...string) *URLBuilder {
 	return NewURLBuilder().Scheme("https").Host(host).AppendPath(pathSegments...)
+}
+
+// FromURL 从现有URL字符串创建构建器
+func FromURL(rawURL string) (*URLBuilder, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("解析URL失败: %w", err)
+	}
+
+	builder := &URLBuilder{
+		scheme:   u.Scheme,
+		host:     u.Hostname(),
+		port:     u.Port(),
+		fragment: u.Fragment,
+		query:    u.Query(),
+	}
+
+	if u.Path != "" {
+		builder.path.WriteString(u.Path)
+	}
+
+	return builder, nil
 }
 
 // Join 简单的路径拼接函数

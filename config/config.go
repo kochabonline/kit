@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-playground/validator/v10"
 	"github.com/spf13/viper"
 
 	"github.com/kochabonline/kit/core/reflect"
@@ -22,11 +23,12 @@ var (
 )
 
 type Config struct {
-	viper    *viper.Viper // viper is the underlying viper instance
-	provider Provider     // provider is the provider of the configuration, e.g., file, etc.
-	path     []string     // path is the path to the configuration file, can be multiple paths.
-	name     string       // name is the name of the configuration file without extension.
-	dest     any          // dest is the destination where the configuration will be unmarshalled.
+	viper    *viper.Viper        // viper is the underlying viper instance
+	validate *validator.Validate // Validate is the validator instance
+	provider Provider            // provider is the provider of the configuration, e.g., file, etc.
+	path     []string            // path is the path to the configuration file, can be multiple paths.
+	name     string              // name is the name of the configuration file without extension.
+	dest     any                 // dest is the destination where the configuration will be unmarshalled.
 }
 
 type Option func(*Config)
@@ -34,6 +36,12 @@ type Option func(*Config)
 func WithViper(v *viper.Viper) Option {
 	return func(c *Config) {
 		c.viper = v
+	}
+}
+
+func WithValidate(v *validator.Validate) Option {
+	return func(c *Config) {
+		c.validate = v
 	}
 }
 
@@ -63,9 +71,10 @@ func WithDest(dest any) Option {
 
 func New(opts ...Option) *Config {
 	c := &Config{
+		viper:    viper.New(),
+		validate: validator.New(),
 		provider: ProviderFile,
 		path:     []string{"."},
-		viper:    viper.New(),
 	}
 
 	for _, opt := range opts {
@@ -116,6 +125,10 @@ func (c *Config) ReadInConfig() error {
 		return err
 	}
 
+	if err := c.validate.Struct(c.dest); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -126,6 +139,8 @@ func (c *Config) WatchConfig() error {
 			log.Error().Err(err).Msg("failed to reload config")
 		}
 	})
+
 	c.viper.WatchConfig()
+
 	return nil
 }

@@ -19,7 +19,7 @@ import (
 // 默认配置值
 const (
 	DefaultShutdownTimeout = 30 * time.Second
-	DefaultCancelTimeout   = 30 * time.Second
+	DefaultCloseTimeout    = 30 * time.Second
 )
 
 // 默认关闭信号
@@ -27,7 +27,7 @@ var DefaultSignals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
 
 var (
 	ErrAlreadyStarted = errors.New("application already started")
-	ErrCleanupPanic   = errors.New("cleanup function panicked")
+	ErrClosePanic     = errors.New("close function panicked")
 )
 
 // Option 定义 Application 的配置选项
@@ -42,21 +42,21 @@ func (f optionFunc) apply(app *Application) {
 	f(app)
 }
 
-// Application 管理服务器和清理函数的生命周期
+// Application 管理服务器和关闭函数的生命周期
 type Application struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	shutdownTimeout time.Duration
 	signals         []os.Signal
 	servers         []transport.Server
-	cancelFuncs     []CancelFunc
-	cancelTimeout   time.Duration
+	closeFuncs      []CloseFunc
+	closeTimeout    time.Duration
 	mu              sync.RWMutex
 	started         bool
 }
 
-// CancelFunc 具有可选超时的清理函数
-type CancelFunc struct {
+// CloseFunc 具有可选超时的关闭函数
+type CloseFunc struct {
 	Name    string
 	Fn      func(context.Context) error
 	Timeout time.Duration
@@ -66,10 +66,10 @@ type CancelFunc struct {
 func New(options ...Option) *Application {
 	app := &Application{
 		shutdownTimeout: DefaultShutdownTimeout,
-		cancelTimeout:   DefaultCancelTimeout,
+		closeTimeout:    DefaultCloseTimeout,
 		signals:         make([]os.Signal, len(DefaultSignals)),
 		servers:         make([]transport.Server, 0),
-		cancelFuncs:     make([]CancelFunc, 0),
+		closeFuncs:      make([]CloseFunc, 0),
 	}
 
 	// 复制默认信号
@@ -104,11 +104,11 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 	})
 }
 
-// WithCancelTimeout 设置清理函数的默认超时时间
-func WithCancelTimeout(timeout time.Duration) Option {
+// WithCloseTimeout 设置关闭函数的默认超时时间
+func WithCloseTimeout(timeout time.Duration) Option {
 	return optionFunc(func(app *Application) {
 		if timeout > 0 {
-			app.cancelTimeout = timeout
+			app.closeTimeout = timeout
 		}
 	})
 }
@@ -143,25 +143,25 @@ func WithServers(servers ...transport.Server) Option {
 	})
 }
 
-// WithCancel 添加在关闭期间执行的清理函数
-func WithCancel(name string, fn func(context.Context) error, timeout time.Duration) Option {
+// WithClose 添加在关闭期间执行的关闭函数
+func WithClose(name string, fn func(context.Context) error, timeout time.Duration) Option {
 	return optionFunc(func(app *Application) {
 		if fn == nil {
-			log.Warn().Str("name", name).Msg("nil cancel function ignored")
+			log.Warn().Str("name", name).Msg("nil close function ignored")
 			return
 		}
 
 		if timeout == 0 {
-			timeout = app.cancelTimeout
+			timeout = app.closeTimeout
 		}
 
-		cleanup := CancelFunc{
+		close := CloseFunc{
 			Name:    name,
 			Fn:      fn,
 			Timeout: timeout,
 		}
 
-		app.cancelFuncs = append(app.cancelFuncs, cleanup)
+		app.closeFuncs = append(app.closeFuncs, close)
 	})
 }
 
@@ -184,26 +184,26 @@ func (app *Application) AddServer(server transport.Server) error {
 	return nil
 }
 
-// RegisterCancel 在运行时向应用添加清理函数
-func (app *Application) RegisterCancel(name string, fn func(context.Context) error, timeout time.Duration) error {
+// RegisterClose 在运行时向应用添加关闭函数
+func (app *Application) RegisterClose(name string, fn func(context.Context) error, timeout time.Duration) error {
 	if fn == nil {
-		return errors.New("cancel function cannot be nil")
+		return errors.New("close function cannot be nil")
 	}
 
 	app.mu.Lock()
 	defer app.mu.Unlock()
 
 	if timeout == 0 {
-		timeout = app.cancelTimeout
+		timeout = app.closeTimeout
 	}
 
-	cancel := CancelFunc{
+	close := CloseFunc{
 		Name:    name,
 		Fn:      fn,
 		Timeout: timeout,
 	}
 
-	app.cancelFuncs = append(app.cancelFuncs, cancel)
+	app.closeFuncs = append(app.closeFuncs, close)
 
 	return nil
 }
@@ -266,7 +266,7 @@ func (app *Application) Start() error {
 		return err
 	}
 
-	app.runCleanupTasks()
+	app.runCloseTasks()
 
 	return nil
 }
@@ -318,55 +318,55 @@ func (app *Application) startServers(eg *errgroup.Group, ctx context.Context, se
 	}()
 }
 
-// runCleanupTasks 执行所有清理函数
-func (app *Application) runCleanupTasks() {
+// runCloseTasks 执行所有关闭函数
+func (app *Application) runCloseTasks() {
 	app.mu.RLock()
-	cancelFuncs := make([]CancelFunc, len(app.cancelFuncs))
-	copy(cancelFuncs, app.cancelFuncs)
+	closeFuncs := make([]CloseFunc, len(app.closeFuncs))
+	copy(closeFuncs, app.closeFuncs)
 	app.mu.RUnlock()
 
-	if len(cancelFuncs) == 0 {
+	if len(closeFuncs) == 0 {
 		return
 	}
 
-	// 并发执行清理函数
+	// 并发执行关闭函数
 	eg := &errgroup.Group{}
-	for _, cancel := range cancelFuncs {
-		cancel := cancel
+	for _, close := range closeFuncs {
+		close := close
 		eg.Go(func() error {
-			return app.runCleanupTask(cancel)
+			return app.runCloseTask(close)
 		})
 	}
 
 	if err := eg.Wait(); err != nil {
-		log.Error().Err(err).Msg("some cleanup functions failed")
+		log.Error().Err(err).Msg("some close functions failed")
 	}
 }
 
-// runCleanupTask 执行单个带超时的清理函数
-func (app *Application) runCleanupTask(cleanup CancelFunc) error {
-	ctx, cancel := context.WithTimeout(context.Background(), cleanup.Timeout)
+// runCloseTask 执行单个带超时的关闭函数
+func (app *Application) runCloseTask(close CloseFunc) error {
+	ctx, cancel := context.WithTimeout(context.Background(), close.Timeout)
 	defer cancel()
 
 	done := make(chan error, 1)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Error().Interface("panic", r).Str("cleanup", cleanup.Name).Msg("cleanup function panicked")
-				done <- ErrCleanupPanic
+				log.Error().Interface("panic", r).Str("close", close.Name).Msg("close function panicked")
+				done <- ErrClosePanic
 			}
 		}()
-		done <- cleanup.Fn(ctx)
+		done <- close.Fn(ctx)
 	}()
 
 	select {
 	case err := <-done:
 		if err != nil {
-			log.Error().Err(err).Str("cleanup", cleanup.Name).Msg("cleanup function failed")
+			log.Error().Err(err).Str("close", close.Name).Msg("close function failed")
 		}
 		return err
 	case <-ctx.Done():
-		log.Warn().Str("cleanup", cleanup.Name).Msg("cleanup function timed out")
+		log.Warn().Str("close", close.Name).Msg("close function timed out")
 		return ctx.Err()
 	}
 }
@@ -377,20 +377,18 @@ func (app *Application) Info() ApplicationInfo {
 	defer app.mu.RUnlock()
 
 	return ApplicationInfo{
-		Started:      app.started,
-		ServerCount:  len(app.servers),
-		CleanupCount: len(app.cancelFuncs),
+		Started:     app.started,
+		ServerCount: len(app.servers),
+		CloseCount:  len(app.closeFuncs),
 	}
 }
 
 // ApplicationInfo 提供应用状态信息
 type ApplicationInfo struct {
-	Started      bool `json:"started"`
-	ServerCount  int  `json:"server_count"`
-	CleanupCount int  `json:"cleanup_count"`
+	Started     bool `json:"started"`
+	ServerCount int  `json:"server_count"`
+	CloseCount  int  `json:"close_count"`
 }
-
-// 高级选项
 
 // WithServerHealthCheck 添加具有健康检查功能的服务器
 func WithServerHealthCheck(server transport.Server, healthCheck func() error) Option {
@@ -398,9 +396,9 @@ func WithServerHealthCheck(server transport.Server, healthCheck func() error) Op
 		if server != nil {
 			app.servers = append(app.servers, server)
 
-			// 添加健康检查作为清理函数
+			// 添加健康检查作为关闭函数
 			if healthCheck != nil {
-				app.cancelFuncs = append(app.cancelFuncs, CancelFunc{
+				app.closeFuncs = append(app.closeFuncs, CloseFunc{
 					Name: "health-check",
 					Fn: func(ctx context.Context) error {
 						return healthCheck()
@@ -416,12 +414,12 @@ func WithServerHealthCheck(server transport.Server, healthCheck func() error) Op
 func WithGracefulShutdown(preShutdownHook func() error) Option {
 	return optionFunc(func(app *Application) {
 		if preShutdownHook != nil {
-			app.cancelFuncs = append(app.cancelFuncs, CancelFunc{
+			app.closeFuncs = append(app.closeFuncs, CloseFunc{
 				Name: "pre-shutdown-hook",
 				Fn: func(ctx context.Context) error {
 					return preShutdownHook()
 				},
-				Timeout: app.cancelTimeout,
+				Timeout: app.closeTimeout,
 			})
 		}
 	})
@@ -431,8 +429,8 @@ func WithGracefulShutdown(preShutdownHook func() error) Option {
 func WithStartupValidation(validator func() error) Option {
 	return optionFunc(func(app *Application) {
 		if validator != nil {
-			// 添加验证作为特殊的清理函数，优先运行
-			validation := CancelFunc{
+			// 添加验证作为特殊的关闭函数，优先运行
+			validation := CloseFunc{
 				Name: "startup-validation",
 				Fn: func(ctx context.Context) error {
 					return validator()
@@ -441,7 +439,7 @@ func WithStartupValidation(validator func() error) Option {
 			}
 
 			// 插入到开头
-			app.cancelFuncs = append([]CancelFunc{validation}, app.cancelFuncs...)
+			app.closeFuncs = append([]CloseFunc{validation}, app.closeFuncs...)
 		}
 	})
 }

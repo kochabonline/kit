@@ -27,16 +27,13 @@ const (
 	ContentTypeForm = "application/x-www-form-urlencoded"
 	ContentTypeXML  = "application/xml"
 	ContentTypeText = "text/plain"
+)
 
+const (
 	// Buffer pool constants
 	defaultBufferSize = 4096
 	maxBufferSize     = 1024 * 1024 // 1MB
 )
-
-// Clienter defines the interface for HTTP client operations
-type Clienter interface {
-	Request(method, url string, body any, opts ...func(*RequestOption)) (*http.Response, error)
-}
 
 // Client represents an HTTP client with connection pooling and request optimization
 type Client struct {
