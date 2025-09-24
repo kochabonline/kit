@@ -46,7 +46,7 @@ func structToMap(target any, config *MapOption) (map[string]any, error) {
 	valueOf := reflect.ValueOf(target)
 
 	// Handle pointer type
-	if valueOf.Kind() == reflect.Ptr {
+	if valueOf.Kind() == reflect.Pointer {
 		if valueOf.IsNil() {
 			return nil, nil
 		}
