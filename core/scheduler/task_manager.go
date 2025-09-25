@@ -1,4 +1,4 @@
-package redis
+package scheduler
 
 import (
 	"context"
@@ -531,4 +531,97 @@ func (tm *TaskManager) removeDuplicates(ids []string) []string {
 	}
 
 	return unique
+}
+
+// FindOrphanTasks 查找孤儿任务（分配给已下线工作节点的任务）
+func (tm *TaskManager) FindOrphanTasks(ctx context.Context, offlineWorkerIDs []string) ([]*Task, error) {
+	if len(offlineWorkerIDs) == 0 {
+		return nil, nil
+	}
+
+	// 创建离线工作节点ID的映射以便快速查找
+	offlineWorkers := make(map[string]bool)
+	for _, workerID := range offlineWorkerIDs {
+		offlineWorkers[workerID] = true
+	}
+
+	// 获取所有运行中和已调度的任务
+	var orphanTasks []*Task
+
+	// 检查运行中的任务
+	runningTaskIDs, err := tm.client.SMembers(ctx, tm.keys.TaskRunning).Result()
+	if err == nil {
+		for _, taskID := range runningTaskIDs {
+			task, err := tm.GetTask(ctx, taskID)
+			if err != nil {
+				continue
+			}
+			if task.WorkerID != "" && offlineWorkers[task.WorkerID] {
+				orphanTasks = append(orphanTasks, task)
+			}
+		}
+	}
+
+	// 检查已调度的任务
+	scheduledTaskIDs, err := tm.client.SMembers(ctx, tm.keys.TaskScheduled).Result()
+	if err == nil {
+		for _, taskID := range scheduledTaskIDs {
+			task, err := tm.GetTask(ctx, taskID)
+			if err != nil {
+				continue
+			}
+			if task.WorkerID != "" && offlineWorkers[task.WorkerID] {
+				orphanTasks = append(orphanTasks, task)
+			}
+		}
+	}
+
+	return orphanTasks, nil
+}
+
+// RescheduleOrphanTasks 重调度孤儿任务
+func (tm *TaskManager) RescheduleOrphanTasks(ctx context.Context, orphanTasks []*Task) error {
+	if len(orphanTasks) == 0 {
+		return nil
+	}
+
+	pipe := tm.client.Pipeline()
+
+	for _, task := range orphanTasks {
+		// 重置任务状态为待处理
+		oldStatus := task.Status
+		task.Status = TaskStatusPending
+		task.WorkerID = ""
+		task.ScheduledAt = 0
+		task.UpdatedAt = time.Now().Unix()
+		task.Version++
+
+		// 序列化任务
+		taskJSON, err := json.Marshal(task)
+		if err != nil {
+			continue
+		}
+
+		// 更新任务数据
+		pipe.HSet(ctx, tm.keys.TaskHash, task.ID, taskJSON)
+
+		// 从旧状态集合中移除
+		switch oldStatus {
+		case TaskStatusScheduled:
+			pipe.SRem(ctx, tm.keys.TaskScheduled, task.ID)
+		case TaskStatusRunning:
+			pipe.SRem(ctx, tm.keys.TaskRunning, task.ID)
+		}
+
+		// 重新加入待处理队列
+		score := tm.calculatePriorityScore(task.Priority, task.CreatedAt)
+		pipe.ZAdd(ctx, tm.keys.TaskPriorityQueue, redis.Z{
+			Score:  score,
+			Member: task.ID,
+		})
+		pipe.LPush(ctx, tm.keys.TaskQueue, task.ID)
+	}
+
+	_, err := pipe.Exec(ctx)
+	return err
 }

@@ -34,6 +34,12 @@ type Server struct {
 
 type Option func(*Server)
 
+func WithMeta(meta Meta) Option {
+	return func(s *Server) {
+		s.meta = meta
+	}
+}
+
 func WithMetricsOptions(metrics MetricsOption) Option {
 	return func(s *Server) {
 		if err := metrics.init(); err != nil {

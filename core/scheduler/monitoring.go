@@ -1,4 +1,4 @@
-package redis
+package scheduler
 
 import (
 	"context"
@@ -298,12 +298,88 @@ func (hc *HealthChecker) performHealthCheck(ctx context.Context) {
 	start := time.Now()
 
 	if err := hc.scheduler.Health(ctx); err != nil {
-		log.Error().Err(err).Msg("health check failed")
+		log.Error().Err(err).Msg("scheduler health check failed")
 		return
 	}
 
-	duration := time.Since(start)
-	log.Debug().Dur("duration", duration).Msg("health check passed")
+	elapsed := time.Since(start)
+	log.Debug().
+		Dur("duration", elapsed).
+		Msg("scheduler health check completed")
+}
+
+// WorkerHealthMonitor 工作节点健康监控器
+type WorkerHealthMonitor struct {
+	workerManager *WorkerManager
+	scheduler     Scheduler
+	interval      time.Duration
+	stopChan      chan struct{}
+}
+
+// NewWorkerHealthMonitor 创建工作节点健康监控器
+func NewWorkerHealthMonitor(workerManager *WorkerManager, scheduler Scheduler, interval time.Duration) *WorkerHealthMonitor {
+	return &WorkerHealthMonitor{
+		workerManager: workerManager,
+		scheduler:     scheduler,
+		interval:      interval,
+		stopChan:      make(chan struct{}),
+	}
+}
+
+// Start 启动工作节点健康监控
+func (whm *WorkerHealthMonitor) Start(ctx context.Context) {
+	ticker := time.NewTicker(whm.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-whm.stopChan:
+			return
+		case <-ticker.C:
+			whm.checkWorkerHealth(ctx)
+		}
+	}
+}
+
+// Stop 停止工作节点健康监控
+func (whm *WorkerHealthMonitor) Stop() {
+	close(whm.stopChan)
+}
+
+// checkWorkerHealth 检查工作节点健康状态
+func (whm *WorkerHealthMonitor) checkWorkerHealth(ctx context.Context) {
+	// 获取所有工作节点的租约信息
+	leaseInfos, err := whm.workerManager.GetAllLeaseInfo(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get worker lease info")
+		return
+	}
+
+	var expiredWorkers []string
+	for _, info := range leaseInfos {
+		if !info.IsActive || info.TTLRemaining <= 0 {
+			expiredWorkers = append(expiredWorkers, info.WorkerID)
+		}
+	}
+
+	if len(expiredWorkers) > 0 {
+		log.Warn().
+			Strs("expiredWorkers", expiredWorkers).
+			Msg("detected expired worker leases")
+
+		// 通过调度器接口处理工作节点下线事件
+		if scheduler, ok := whm.scheduler.(*redisScheduler); ok {
+			for _, workerID := range expiredWorkers {
+				if err := scheduler.handleWorkerOffline(ctx, workerID); err != nil {
+					log.Error().Err(err).
+						Str("workerId", workerID).
+						Msg("failed to handle worker offline")
+				}
+			}
+		}
+	}
 }
 
 // PerformanceMonitor 性能监控器

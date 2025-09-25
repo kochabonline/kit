@@ -1,4 +1,4 @@
-package redis
+package scheduler
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func NewScheduler(redisConfig *redis.SingleConfig, options *SchedulerOptions) (S
 
 	// 初始化组件
 	scheduler.taskManager = NewTaskManager(client.Client, keys)
-	scheduler.workerManager = NewWorkerManager(client.Client, keys, options.HeartbeatInterval, options.HeartbeatInterval*3)
+	scheduler.workerManager = NewWorkerManager(client.Client, keys, options.WorkerLeaseTTL)
 	scheduler.eventManager = NewEventManager(client.Client, keys, options.StreamGroup, options.StreamConsumerID, options.StreamMaxLen)
 	scheduler.lockManager = NewRedisLockManager(client.Client)
 	scheduler.leaderElector = NewRedisLeaderElector(client.Client, options.NodeID, keys.LeaderLock, options.LeaderLeaseDuration)
@@ -114,9 +114,6 @@ func (s *redisScheduler) Start(ctx context.Context) error {
 	// 注册核心事件回调
 	s.registerCoreEventCallbacks()
 
-	// 启动工作节点心跳监控
-	s.workerManager.StartHeartbeatMonitor(ctx)
-
 	// 启动Leader选举
 	if err := s.leaderElector.CampaignLeader(ctx); err != nil {
 		log.Error().Err(err).Msg("failed to campaign for leader, will retry")
@@ -129,6 +126,10 @@ func (s *redisScheduler) Start(ctx context.Context) error {
 	// 启动Leader选举监控
 	s.wg.Add(1)
 	go s.runLeaderElectionMonitor(ctx)
+
+	// 启动孤儿任务检测和恢复
+	s.wg.Add(1)
+	go s.runOrphanTaskRecovery(ctx)
 
 	// 启动健康检查
 	if s.options.HealthCheckInterval > 0 {
@@ -715,4 +716,146 @@ func generateTaskID() string {
 		return fmt.Sprintf("task-%d", time.Now().UnixNano())
 	}
 	return "task-" + hex.EncodeToString(bytes)
+}
+
+// runOrphanTaskRecovery 运行孤儿任务恢复循环
+func (s *redisScheduler) runOrphanTaskRecovery(ctx context.Context) {
+	defer s.wg.Done()
+
+	ticker := time.NewTicker(30 * time.Second) // 每30秒检查一次
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.stopChan:
+			return
+		case <-ticker.C:
+			// 只有Leader才执行孤儿任务恢复
+			if s.isLeader {
+				if err := s.detectAndRecoverOrphanTasks(ctx); err != nil {
+					log.Error().Err(err).Msg("failed to recover orphan tasks")
+				}
+			}
+		}
+	}
+}
+
+// detectAndRecoverOrphanTasks 检测并恢复孤儿任务
+func (s *redisScheduler) detectAndRecoverOrphanTasks(ctx context.Context) error {
+	// 获取所有工作节点
+	allWorkers, err := s.workerManager.ListWorkers(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to list all workers: %w", err)
+	}
+
+	// 获取在线工作节点
+	onlineWorkers, err := s.workerManager.GetOnlineWorkers(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get online workers: %w", err)
+	}
+
+	// 创建在线工作节点映射
+	onlineWorkerMap := make(map[string]bool)
+	for _, worker := range onlineWorkers {
+		onlineWorkerMap[worker.ID] = true
+	}
+
+	// 找出下线的工作节点
+	var offlineWorkerIDs []string
+	for _, worker := range allWorkers {
+		if !onlineWorkerMap[worker.ID] {
+			offlineWorkerIDs = append(offlineWorkerIDs, worker.ID)
+		}
+	}
+
+	if len(offlineWorkerIDs) == 0 {
+		return nil // 没有下线的工作节点
+	}
+
+	// 查找孤儿任务
+	orphanTasks, err := s.taskManager.FindOrphanTasks(ctx, offlineWorkerIDs)
+	if err != nil {
+		return fmt.Errorf("failed to find orphan tasks: %w", err)
+	}
+
+	if len(orphanTasks) == 0 {
+		return nil // 没有孤儿任务
+	}
+
+	log.Info().
+		Int("orphanCount", len(orphanTasks)).
+		Strs("offlineWorkers", offlineWorkerIDs).
+		Msg("found orphan tasks, starting recovery")
+
+	// 重调度孤儿任务
+	if err := s.taskManager.RescheduleOrphanTasks(ctx, orphanTasks); err != nil {
+		return fmt.Errorf("failed to reschedule orphan tasks: %w", err)
+	}
+
+	// 发布任务重调度事件
+	for _, task := range orphanTasks {
+		if err := s.eventManager.PublishTaskEvent(ctx, EventTaskRescheduled, task, "Worker offline recovery"); err != nil {
+			log.Error().Err(err).Str("taskId", task.ID).Msg("failed to publish task rescheduled event")
+		}
+	}
+
+	log.Info().
+		Int("rescheduledCount", len(orphanTasks)).
+		Msg("orphan tasks recovery completed")
+
+	return nil
+}
+
+// handleWorkerOffline 处理工作节点下线
+func (s *redisScheduler) handleWorkerOffline(ctx context.Context, workerID string) error {
+	log.Info().Str("workerId", workerID).Msg("handling worker offline")
+
+	// 获取工作节点信息
+	worker, err := s.workerManager.GetWorker(ctx, workerID)
+	if err != nil && err != ErrWorkerNotFound {
+		return fmt.Errorf("failed to get worker info: %w", err)
+	}
+
+	// 如果工作节点已经不存在，直接返回
+	if err == ErrWorkerNotFound {
+		log.Warn().Str("workerId", workerID).Msg("worker not found, may already be removed")
+		return nil
+	}
+
+	// 发布工作节点下线事件
+	if err := s.eventManager.PublishWorkerEvent(ctx, EventWorkerOffline, worker); err != nil {
+		log.Error().Err(err).Str("workerId", workerID).Msg("failed to publish worker offline event")
+	}
+
+	// 如果是Leader，立即检测并恢复该工作节点的任务
+	if s.isLeader {
+		orphanTasks, err := s.taskManager.FindOrphanTasks(ctx, []string{workerID})
+		if err != nil {
+			log.Error().Err(err).Str("workerId", workerID).Msg("failed to find orphan tasks for offline worker")
+		} else if len(orphanTasks) > 0 {
+			log.Info().
+				Int("orphanCount", len(orphanTasks)).
+				Str("workerId", workerID).
+				Msg("found orphan tasks for offline worker, starting immediate recovery")
+
+			if err := s.taskManager.RescheduleOrphanTasks(ctx, orphanTasks); err != nil {
+				log.Error().Err(err).Str("workerId", workerID).Msg("failed to reschedule orphan tasks")
+			} else {
+				// 发布任务重调度事件
+				for _, task := range orphanTasks {
+					if err := s.eventManager.PublishTaskEvent(ctx, EventTaskRescheduled, task, "Worker offline recovery"); err != nil {
+						log.Error().Err(err).Str("taskId", task.ID).Msg("failed to publish task rescheduled event")
+					}
+				}
+				log.Info().
+					Int("rescheduledCount", len(orphanTasks)).
+					Str("workerId", workerID).
+					Msg("immediate orphan task recovery completed")
+			}
+		}
+	}
+
+	return nil
 }

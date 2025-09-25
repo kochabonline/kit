@@ -1,4 +1,4 @@
-package redis
+package scheduler
 
 import (
 	"context"

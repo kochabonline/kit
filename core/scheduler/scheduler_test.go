@@ -1,4 +1,4 @@
-package redis
+package scheduler
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func TestRedisSchedulerBasicFlow(t *testing.T) {
 	defer cancel()
 
 	// 创建 Redis 配置 (要求本地已启动 redis-server 无密码: 6379)
-	cfg := &storeRedis.SingleConfig{Host: "localhost", Port: 6379,Password: "12345678", DB: 0}
+	cfg := &storeRedis.SingleConfig{Host: "localhost", Port: 6379, Password: "12345678", DB: 0}
 	client, err := storeRedis.NewClient(cfg)
 	if err != nil {
 		t.Skipf("无法连接本地 Redis，跳过测试: %v", err)
@@ -33,7 +33,8 @@ func TestRedisSchedulerBasicFlow(t *testing.T) {
 
 	options := DefaultSchedulerOptions()
 	options.NodeID = "test-node-1"
-	options.HeartbeatInterval = 500 * time.Millisecond
+	// 使用>=1s，避免内部最小 TTL 限制产生噪声日志
+	options.WorkerLeaseTTL = 1200 * time.Millisecond
 	options.LeaderLeaseDuration = 3 * time.Second
 	options.EnableMetrics = false   // 简化测试
 	options.HealthCheckInterval = 0 // 关闭周期健康检查
@@ -103,7 +104,7 @@ func TestRedisSchedulerBasicFlow(t *testing.T) {
 	if !ok {
 		t.Fatalf("任务在超时时间内未被调度: %s", task.ID)
 	}
-
+	time.Sleep(10 * time.Second)
 	// 再次获取并断言
 	finalTask, err := sched.GetTask(ctx, task.ID)
 	require.NoError(t, err)

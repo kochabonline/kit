@@ -191,13 +191,13 @@ func (cli *Client) putBuffer(buf *bytes.Buffer) {
 
 // processResponse processes the HTTP response and handles errors
 func (cli *Client) processResponse(resp *http.Response, dest any) (*http.Response, error) {
-	defer resp.Body.Close()
+	if dest == nil {
+		return resp, nil
+	}
 
-	// Decode response if target is provided
-	if dest != nil {
-		if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
-			return nil, err
-		}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
+		return nil, err
 	}
 
 	return resp, nil

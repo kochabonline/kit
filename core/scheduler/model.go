@@ -1,4 +1,4 @@
-package redis
+package scheduler
 
 import (
 	"errors"
@@ -150,6 +150,7 @@ type EventType string
 const (
 	EventTaskSubmitted    EventType = "task_submitted"    // 任务提交
 	EventTaskScheduled    EventType = "task_scheduled"    // 任务调度
+	EventTaskRescheduled  EventType = "task_rescheduled"  // 任务重调度
 	EventTaskStarted      EventType = "task_started"      // 任务开始
 	EventTaskCompleted    EventType = "task_completed"    // 任务完成
 	EventTaskFailed       EventType = "task_failed"       // 任务失败
@@ -207,8 +208,7 @@ type Task struct {
 	RetryInterval time.Duration `json:"retryInterval,omitempty"` // 重试间隔
 
 	// 超时配置
-	Timeout        time.Duration `json:"timeout,omitempty"` // 执行超时时间
-	HeartbeatCheck bool          `json:"heartbeatCheck"`    // 是否启用心跳检查
+	Timeout time.Duration `json:"timeout,omitempty"` // 执行超时时间
 
 	// 依赖关系
 	Dependencies []string `json:"dependencies,omitempty"` // 依赖的任务ID列表
@@ -249,9 +249,8 @@ type Worker struct {
 	Priority int `json:"priority"` // 优先级
 
 	// 时间信息
-	LastHeartbeat int64 `json:"lastHeartbeat"` // 最后心跳时间戳
-	CreatedAt     int64 `json:"createdAt"`     // 创建时间戳
-	UpdatedAt     int64 `json:"updatedAt"`     // 更新时间戳
+	CreatedAt int64 `json:"createdAt"` // 创建时间戳
+	UpdatedAt int64 `json:"updatedAt"` // 更新时间戳
 
 	// 统计信息
 	CompletedTasks int64 `json:"completedTasks"` // 已完成任务数
@@ -259,6 +258,18 @@ type Worker struct {
 
 	// 版本控制
 	Version int64 `json:"version"` // 版本号
+}
+
+// WorkerLeaseInfo 工作节点租约信息
+type WorkerLeaseInfo struct {
+	WorkerID       string        `json:"workerId"`       // 工作节点ID
+	IsActive       bool          `json:"isActive"`       // 租约是否活跃
+	TTLRemaining   time.Duration `json:"ttlRemaining"`   // 剩余TTL时间
+	LastRenewal    time.Time     `json:"lastRenewal"`    // 最后续约时间
+	Status         WorkerStatus  `json:"status"`         // 工作节点状态
+	LeaseExpiredAt time.Time     `json:"leaseExpiredAt"` // 租约过期时间
+	ConfiguredTTL  time.Duration `json:"configuredTTL"`  // 配置的TTL
+	RenewInterval  time.Duration `json:"renewInterval"`  // 推荐的续约间隔
 }
 
 // SchedulerEvent 调度器事件
@@ -355,13 +366,14 @@ type SchedulerOptions struct {
 	// 选举配置
 	ElectionTimeout     time.Duration `yaml:"electionTimeout"`     // 选举超时时间
 	LeaderLeaseDuration time.Duration `yaml:"leaderLeaseDuration"` // Leader租约时长
-	HeartbeatInterval   time.Duration `yaml:"heartbeatInterval"`   // 心跳间隔
+
+	// 工作节点租约配置
+	WorkerLeaseTTL time.Duration `yaml:"workerLeaseTTL"` // 工作节点租约TTL
 
 	// 任务配置
 	TaskTimeout       time.Duration `yaml:"taskTimeout"`       // 任务超时时间
 	TaskRetryInterval time.Duration `yaml:"taskRetryInterval"` // 任务重试间隔
 	MaxRetries        int           `yaml:"maxRetries"`        // 最大重试次数
-	EnableHeartbeat   bool          `yaml:"enableHeartbeat"`   // 启用心跳检查
 
 	// 负载均衡配置
 	LoadBalanceStrategy LoadBalanceStrategy `yaml:"loadBalanceStrategy"` // 负载均衡策略
@@ -396,11 +408,10 @@ func DefaultSchedulerOptions() *SchedulerOptions {
 		RedisDB:             0,
 		ElectionTimeout:     30 * time.Second,
 		LeaderLeaseDuration: 60 * time.Second,
-		HeartbeatInterval:   10 * time.Second,
+		WorkerLeaseTTL:      30 * time.Second,
 		TaskTimeout:         5 * time.Minute,
 		TaskRetryInterval:   30 * time.Second,
 		MaxRetries:          3,
-		EnableHeartbeat:     true,
 		LoadBalanceStrategy: StrategyLeastTasks,
 		EnableMetrics:       true,
 		MetricsInterval:     30 * time.Second,
@@ -482,7 +493,6 @@ func NewRedisKeys(prefix string) *RedisKeys {
 		WorkerHash:        prefix + ":worker",
 		WorkerOnline:      prefix + ":set:worker:online",
 		WorkerBusy:        prefix + ":set:worker:busy",
-		WorkerHeartbeat:   prefix + ":heartbeat:worker:",
 		EventStream:       prefix + ":stream:event",
 		EventChannel:      prefix + ":channel:event",
 		MetricsHash:       prefix + ":metrics",
