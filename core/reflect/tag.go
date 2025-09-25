@@ -29,7 +29,7 @@ func WithTag(tag string) func(*TagOption) {
 func validateTarget(target any) (reflect.Type, reflect.Value, error) {
 	valueOf := reflect.ValueOf(target)
 
-	if valueOf.Kind() != reflect.Ptr {
+	if valueOf.Kind() != reflect.Pointer {
 		return nil, reflect.Value{}, ErrTagTargetMustBePointer
 	}
 
@@ -66,8 +66,11 @@ func setStructDefaults(t reflect.Type, v reflect.Value, tagName string) error {
 		tagValue := field.Tag.Get(tagName)
 		fieldValue := v.Field(i)
 
-		// Skip if field value is not zero value
-		if !fieldValue.IsZero() {
+		// For slices, even if they are not zero, we need to process their elements
+		if field.Type.Kind() == reflect.Slice && !fieldValue.IsNil() {
+			if err := processExistingSlice(fieldValue, tagName); err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -76,8 +79,27 @@ func setStructDefaults(t reflect.Type, v reflect.Value, tagName string) error {
 			continue
 		}
 
+		// Skip if field value is not zero value
+		if !fieldValue.IsZero() {
+			continue
+		}
+
 		if err := setFieldValue(fieldValue, tagValue); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// processExistingSlice processes existing slice elements to set their default values
+func processExistingSlice(value reflect.Value, tagName string) error {
+	for i := 0; i < value.Len(); i++ {
+		elem := value.Index(i)
+		if elem.Kind() == reflect.Struct {
+			// For struct types, recursively set default values
+			if err := SetDefaultTag(elem.Addr().Interface(), WithTag(tagName)); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -125,7 +147,7 @@ func setFieldValue(value reflect.Value, tagValue string) error {
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 		reflect.Float32, reflect.Float64, reflect.Bool:
 		return parseSetValue(value, tagValue)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		value.Set(reflect.New(value.Type().Elem()))
 	case reflect.Slice:
 		return setSliceValue(value, tagValue)

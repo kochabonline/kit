@@ -81,18 +81,9 @@ func New(opts ...Option) *Config {
 		opt(c)
 	}
 
-	if err := c.init(); err != nil {
-		log.Fatal().Err(err).Send()
-		return nil
-	}
-
 	c.setupViper()
 
 	return c
-}
-
-func (c *Config) init() error {
-	return reflect.SetDefaultTag(c.dest)
 }
 
 // setupViper configures the viper instance based on the Config settings
@@ -122,6 +113,10 @@ func (c *Config) ReadInConfig() error {
 	}
 
 	if err := c.viper.Unmarshal(&c.dest); err != nil {
+		return err
+	}
+
+	if err := reflect.SetDefaultTag(c.dest); err != nil {
 		return err
 	}
 

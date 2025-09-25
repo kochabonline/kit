@@ -1,0 +1,11 @@
+mock2:
+  number:
+    - 1
+    - 2
+    - 3
+
+apis:
+  - name: "GetUser"
+    url: "https://api.example.com/user"
+    headers:
+      Authorization: "Bearer token"

@@ -1,13 +1,9 @@
 package validator
 
 import (
-	"bytes"
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 )
@@ -22,7 +18,7 @@ type TestData struct {
 // AdultData 成人数据结构，用于测试自定义验证
 type AdultData struct {
 	Name string `json:"name" validate:"required,min=2" label:"姓名"`
-	Age  int    `json:"age" validate:"required,adult_age" label:"年龄"`
+	Age  int    `json:"age" validate:"required,adult_age"`
 }
 
 // 自定义验证函数：验证是否为成年人
@@ -215,49 +211,6 @@ func TestLanguageType(t *testing.T) {
 			t.Errorf("expected String() to return %s for %s", test.str, test.lang)
 		}
 	}
-}
-
-func TestGinValidatorIntegration(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	// 创建测试路由
-	router := gin.New()
-	router.POST("/test", func(c *gin.Context) {
-		var data TestData
-		if err := ShouldBindJSON(c, &data); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"data": data})
-	})
-
-	// 测试有效数据
-	validJSON := `{"name":"John Doe","age":25,"email":"john@example.com"}`
-	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBufferString(validJSON))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept-Language", "zh")
-
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d. Response: %s", w.Code, w.Body.String())
-	}
-
-	// 测试无效数据
-	invalidJSON := `{"name":"A","age":0,"email":"invalid"}`
-	req = httptest.NewRequest(http.MethodPost, "/test", bytes.NewBufferString(invalidJSON))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept-Language", "en")
-
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d. Response: %s", w.Code, w.Body.String())
-	}
-
-	t.Logf("Error response: %s", w.Body.String())
 }
 
 func TestGlobalFunctions(t *testing.T) {

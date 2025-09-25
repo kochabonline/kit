@@ -21,6 +21,30 @@ type bmi struct {
 	Weight float64 `default:"70.5"`
 }
 
+type Api struct {
+	Name    string            `json:"name"`
+	Method  string            `json:"method" default:"GET"`
+	Url     string            `json:"url"`
+	Body    string            `json:"body"`
+	Headers map[string]string `json:"headers"`
+	Timeout int               `json:"timeout" default:"3"`
+	Period  int               `json:"period" default:"10"`
+}
+
+type mockWithSlice struct {
+	Host    string  `json:"host"`
+	Port    int     `json:"port" default:"8080"`
+	Number  float64 `json:"number"`
+	Enabled bool    `json:"enabled" default:"true"`
+	Mock1   struct {
+		Host string `json:"host" default:"localhost"`
+	} `json:"mock1"`
+	Mock2 struct {
+		Number []int `json:"number"`
+	} `json:"mock2"`
+	Apis []Api `json:"apis"`
+}
+
 func TestTag(t *testing.T) {
 	mock := tagMock{Age: 20}
 
@@ -29,4 +53,30 @@ func TestTag(t *testing.T) {
 	}
 
 	t.Log(mock)
+}
+
+func TestTagWithSliceStruct(t *testing.T) {
+	mock := &mockWithSlice{}
+
+	// 初始化切片，但不设置默认值
+	mock.Apis = []Api{
+		{
+			Name: "test-api",
+			Url:  "http://example.com/api/test",
+		},
+	}
+
+	t.Logf("Before setting defaults: %+v", mock)
+	for i, api := range mock.Apis {
+		t.Logf("  Api[%d]: %+v", i, api)
+	}
+
+	if err := SetDefaultTag(mock); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("After setting defaults: %+v", mock)
+	for i, api := range mock.Apis {
+		t.Logf("  Api[%d]: %+v", i, api)
+	}
 }
