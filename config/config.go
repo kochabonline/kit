@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/go-playground/validator/v10"
 	"github.com/spf13/viper"
 
 	"github.com/kochabonline/kit/core/reflect"
+	"github.com/kochabonline/kit/core/validator"
 	"github.com/kochabonline/kit/log"
 )
 
@@ -24,7 +24,7 @@ var (
 
 type Config struct {
 	viper    *viper.Viper        // viper is the underlying viper instance
-	validate *validator.Validate // Validate is the validator instance
+	validate validator.Validator // Validate is the validator instance
 	provider Provider            // provider is the provider of the configuration, e.g., file, etc.
 	path     []string            // path is the path to the configuration file, can be multiple paths.
 	name     string              // name is the name of the configuration file without extension.
@@ -39,7 +39,7 @@ func WithViper(v *viper.Viper) Option {
 	}
 }
 
-func WithValidate(v *validator.Validate) Option {
+func WithValidate(v validator.Validator) Option {
 	return func(c *Config) {
 		c.validate = v
 	}
@@ -72,7 +72,7 @@ func WithDest(dest any) Option {
 func New(opts ...Option) *Config {
 	c := &Config{
 		viper:    viper.New(),
-		validate: validator.New(),
+		validate: validator.Validate,
 		provider: ProviderFile,
 		path:     []string{"."},
 	}

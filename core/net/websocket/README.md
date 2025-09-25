@@ -243,7 +243,7 @@ client.OnEvent(websocket.EventMessage, func(event websocket.Event) {
 // 连接后订阅数据流
 client.OnEvent(websocket.EventConnected, func(event websocket.Event) {
     // 订阅特定的数据流
-    subscribeMsg := map[string]interface{}{
+    subscribeMsg := map[string]any{
         "action":  "subscribe",
         "streams": []string{"btcusdt@ticker", "ethusdt@ticker"},
     }

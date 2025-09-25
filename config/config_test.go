@@ -5,7 +5,7 @@ import (
 )
 
 type mock struct {
-	Host    string  `json:"host"`
+	Host    string  `json:"host" validate:"required,min=2,max=10"`
 	Port    int     `json:"port" default:"8080"`
 	Number  float64 `json:"number"`
 	Enabled bool    `json:"enabled" default:"true"`

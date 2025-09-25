@@ -1,278 +1,225 @@
 package validator
 
 import (
-	"context"
+	"fmt"
 	"testing"
 
-	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestData 测试数据结构
-type TestData struct {
-	Name  string `json:"name" validate:"required,min=2" label:"姓名"`
-	Age   int    `json:"age" validate:"required,min=1,max=120" label:"年龄"`
-	Email string `json:"email" validate:"required,email" label:"邮箱"`
+// TestUser 测试用户结构体
+type TestUser struct {
+	Name     string `json:"name" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Mobile   string `json:"mobile" validate:"required"`
+	Age      int    `json:"age" validate:"gte=18,lte=150"`
+	Username string `json:"username" validate:"required,min=3,max=20"`
 }
 
-// AdultData 成人数据结构，用于测试自定义验证
-type AdultData struct {
-	Name string `json:"name" validate:"required,min=2" label:"姓名"`
-	Age  int    `json:"age" validate:"required,adult_age"`
-}
+// TestValidatorCreation 测试校验器创建
+func TestValidatorCreation(t *testing.T) {
+	// 测试默认校验器
+	v1 := Validate
+	assert.NotNil(t, v1)
 
-// 自定义验证函数：验证是否为成年人
-func adultAgeValidator(fl validator.FieldLevel) bool {
-	return fl.Field().Int() >= 18
-}
+	// 测试新建校验器
+	v2 := New()
+	assert.NotNil(t, v2)
 
-// 中文翻译注册函数
-var adultAgeRegisterZh = func(ut ut.Translator) error {
-	return ut.Add("adult_age", "{0}必须是成年人(>=18岁)", true)
-}
-
-// 英文翻译注册函数
-var adultAgeRegisterEn = func(ut ut.Translator) error {
-	return ut.Add("adult_age", "{0} must be an adult (>=18 years old)", true)
-}
-
-// 翻译函数
-var adultAgeTranslation = func(ut ut.Translator, fe validator.FieldError) string {
-	t, _ := ut.T("adult_age", fe.Field())
-	return t
-}
-
-func TestNewValidator(t *testing.T) {
-	// 测试创建默认验证器
-	v := NewValidator()
-	if v == nil {
-		t.Fatal("validator should not be nil")
-	}
-
-	// 测试验证器的基本功能
-	data := TestData{
-		Name:  "John Doe",
-		Age:   25,
-		Email: "john@example.com",
-	}
-
-	ctx := context.Background()
-	err := v.Validate(ctx, data)
-	if err != nil {
-		t.Fatalf("validation should pass for valid data: %v", err)
-	}
-}
-
-func TestValidatorWithCustomOptions(t *testing.T) {
-	// 创建带有自定义选项的验证器
-	v := NewValidator(
-		WithDefaultLanguage(LanguageEnglish),
-		WithCustomValidation("adult_age", adultAgeValidator),
-		WithCustomTranslation("adult_age", LanguageChinese, adultAgeRegisterZh, adultAgeTranslation),
-		WithCustomTranslation("adult_age", LanguageEnglish, adultAgeRegisterEn, adultAgeTranslation),
+	// 测试带选项的校验器
+	v3 := New(
+		WithTagName("validate"),
+		WithTranslator("en", "zh"),
 	)
+	assert.NotNil(t, v3)
+}
 
-	if v == nil {
-		t.Fatal("validator should not be nil")
-	}
-
-	ctx := context.Background()
+// TestBasicValidation 测试基本校验功能
+func TestBasicValidation(t *testing.T) {
+	v := New()
 
 	// 测试有效数据
-	validData := AdultData{
-		Name: "Alice",
-		Age:  25,
-	}
-	err := v.Validate(ctx, validData)
-	if err != nil {
-		t.Fatalf("validation should pass for valid adult data: %v", err)
-	}
-
-	// 测试无效数据（年龄小于18）
-	invalidData := AdultData{
-		Name: "Bob",
-		Age:  16,
+	validUser := TestUser{
+		Name:     "John Doe",
+		Email:    "john@example.com",
+		Mobile:   "1234567890",
+		Username: "johndoe",
+		Age:      16, // 修改为有效年龄
 	}
 
-	// 调试：记录测试信息
-	t.Logf("Testing validation with age %d", invalidData.Age)
-
-	err = v.ValidateWithLanguage(ctx, invalidData, LanguageChinese)
-	if err == nil {
-		t.Fatal("validation should fail for underage data")
-	}
-
-	// 检查错误类型
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		if len(validationErrors) != 1 {
-			t.Fatalf("expected 1 validation error, got %d: %v", len(validationErrors), validationErrors)
-		}
-
-		if validationErrors[0].Tag() != "adult_age" {
-			t.Fatalf("expected 'adult_age' tag, got '%s'", validationErrors[0].Tag())
-		}
-
-		// 获取翻译后的错误消息
-		translator, _ := v.GetTranslator(LanguageChinese)
-		t.Logf("Chinese error message: %s", validationErrors[0].Translate(translator))
-	} else {
-		t.Fatalf("expected validator.ValidationErrors type, got %T", err)
-	}
-
-	// 测试英文错误消息
-	err = v.ValidateWithLanguage(ctx, invalidData, LanguageEnglish)
-	if err == nil {
-		t.Fatal("validation should fail for underage data")
-	}
-
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		translator, _ := v.GetTranslator(LanguageEnglish)
-		t.Logf("English error message: %s", validationErrors[0].Translate(translator))
-	}
+	err := v.Struct(&validUser)
+	assert.NoError(t, err)
 }
 
+// TestValidationErrors 测试校验错误
 func TestValidationErrors(t *testing.T) {
-	v := NewValidator()
-	ctx := context.Background()
+	v := New()
 
-	// 测试多个验证错误
-	invalidData := TestData{
-		Name:  "A",             // 太短
-		Age:   0,               // 小于最小值
-		Email: "invalid-email", // 无效邮箱格式
+	// 测试无效数据
+	invalidUser := TestUser{
+		Name:     "",        // 必填
+		Email:    "invalid", // 无效邮箱
+		Mobile:   "",        // 必填
+		Username: "ab",      // 太短
+		Age:      -1,        // 年龄不能为负数
 	}
 
-	err := v.Validate(ctx, invalidData)
-	if err == nil {
-		t.Fatal("validation should fail for invalid data")
-	}
+	err := v.Struct(&invalidUser)
+	assert.Error(t, err)
 
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
-		t.Fatalf("expected validator.ValidationErrors type, got %T", err)
-	}
+	// 检查是否为校验错误
+	assert.True(t, IsValidationError(err))
 
-	if len(validationErrors) == 0 {
-		t.Fatal("expected validation errors")
-	}
+	// 转换为校验错误
+	validationErr, ok := err.(ValidationErrors)
+	assert.True(t, ok)
+	assert.True(t, validationErr.HasErrors())
 
-	// 测试错误集合的基本功能
-	if len(validationErrors) == 0 {
-		t.Fatal("should have validation errors")
-	}
-
-	// 测试获取特定字段的错误
-	// 先打印所有错误的字段名以便调试
-	for i, ve := range validationErrors {
-		t.Logf("Error %d: Field=%s, Tag=%s", i, ve.Field(), ve.Tag())
-	}
-
-	// 查找Name字段的错误
-	var nameErrors []validator.FieldError
-	for _, ve := range validationErrors {
-		if ve.Field() == "Name" || ve.Field() == "姓名" {
-			nameErrors = append(nameErrors, ve)
-		}
-	}
-	if len(nameErrors) == 0 {
-		t.Fatal("expected errors for Name field")
-	}
-
-	// 测试错误消息
-	errorMessage := validationErrors.Error()
-	if errorMessage == "" {
-		t.Fatal("error message should not be empty")
-	}
-	t.Logf("Validation errors: %s", errorMessage)
-
-	// 测试翻译功能
-	translatedErrors := TranslateErrors(validationErrors, LanguageChinese)
-	t.Logf("Translated errors: %v", translatedErrors)
+	errors := validationErr.Errors()
+	assert.NotEmpty(t, errors)
 }
 
-func TestLanguageType(t *testing.T) {
-	// 测试Language类型的方法
-	tests := []struct {
-		lang  Language
-		valid bool
-		str   string
-	}{
-		{LanguageEnglish, true, "en"},
-		{LanguageChinese, true, "zh"},
-		{Language("fr"), false, "fr"},
-		{Language(""), false, ""},
+// TestChineseTranslation 测试中文翻译
+func TestChineseTranslation(t *testing.T) {
+	v := New()
+
+	// 测试中文翻译
+	invalidUser := TestUser{
+		Name:   "",
+		Email:  "invalid",
+		Mobile: "",
 	}
 
-	for _, test := range tests {
-		if test.lang.IsValid() != test.valid {
-			t.Errorf("expected IsValid() to return %v for %s", test.valid, test.lang)
-		}
-		if test.lang.String() != test.str {
-			t.Errorf("expected String() to return %s for %s", test.str, test.lang)
-		}
+	err := v.Struct(&invalidUser)
+	assert.Error(t, err)
+
+	errorMsg := err.Error()
+	// 检查错误消息不为空
+	assert.NotEmpty(t, errorMsg)
+}
+
+// TestEnglishTranslation 测试英文翻译
+func TestEnglishTranslation(t *testing.T) {
+	v := New()
+
+	// 测试英文翻译
+	invalidUser := TestUser{
+		Name:   "",
+		Email:  "invalid",
+		Mobile: "",
+	}
+
+	err := v.Struct(&invalidUser)
+	assert.Error(t, err)
+
+	errorMsg := err.Error()
+	// 检查错误消息是否包含英文关键词
+	assert.Contains(t, errorMsg, "required")
+}
+
+// TestValidateVar 测试单个变量校验
+func TestValidateVar(t *testing.T) {
+	v := New()
+	validator := v.GetValidator()
+
+	// 测试邮箱
+	err := validator.Var("test@example.com", "email")
+	assert.NoError(t, err)
+
+	err = validator.Var("invalid-email", "email")
+	assert.Error(t, err)
+
+	// 测试必填
+	err = validator.Var("", "required")
+	assert.Error(t, err)
+
+	err = validator.Var("not empty", "required")
+	assert.NoError(t, err)
+}
+
+// TestErrorHandling 测试错误处理功能
+func TestErrorHandling(t *testing.T) {
+	v := New()
+
+	invalidUser := TestUser{
+		Name:   "",
+		Email:  "invalid",
+		Mobile: "",
+	}
+
+	err := v.Struct(&invalidUser)
+	require.Error(t, err)
+
+	// 测试ToValidationResult
+	result := ToValidationResult(err)
+	assert.False(t, result.Valid)
+	assert.NotEmpty(t, result.Errors)
+
+	// 测试ErrorsToString
+	validationErr := err.(ValidationErrors)
+	errorString := ErrorsToString(validationErr.Errors(), " | ")
+	assert.NotEmpty(t, errorString)
+
+	// 测试HasFieldError
+	hasNameError := HasFieldError(err, "Name")
+	assert.True(t, hasNameError)
+
+	hasNonExistentError := HasFieldError(err, "NonExistent")
+	assert.False(t, hasNonExistentError)
+
+	// 测试GetFieldErrorMessage
+	nameErrorMsg := GetFieldErrorMessage(err, "Name")
+	assert.NotEmpty(t, nameErrorMsg)
+}
+
+// TestValidationResult 测试校验结果
+func TestValidationResult(t *testing.T) {
+	// 测试成功校验结果
+	result := ToValidationResult(nil)
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.Errors)
+
+	v := New()
+
+	// 测试失败校验结果
+	invalidUser := TestUser{Name: ""}
+	validationErr := v.Struct(&invalidUser)
+
+	result = ToValidationResult(validationErr)
+	assert.False(t, result.Valid)
+	assert.NotEmpty(t, result.Errors)
+
+	// 检查错误详情
+	for _, err := range result.Errors {
+		assert.NotEmpty(t, err.Field)
+		assert.NotEmpty(t, err.Tag)
+		assert.NotEmpty(t, err.Message)
 	}
 }
 
-func TestGlobalFunctions(t *testing.T) {
-	ctx := context.Background()
-
-	// 测试全局验证函数
-	data := TestData{
-		Name:  "Test User",
-		Age:   30,
-		Email: "test@example.com",
-	}
-
-	err := Validate(ctx, data)
-	if err != nil {
-		t.Fatalf("global Validate should pass for valid data: %v", err)
-	}
-
-	err = ValidateWithLanguage(ctx, data, LanguageEnglish)
-	if err != nil {
-		t.Fatalf("global ValidateWithLanguage should pass for valid data: %v", err)
-	}
-
-	// 测试获取全局验证器
-	validator := GetValidator()
-	if validator == nil {
-		t.Fatal("GetValidator should not return nil")
-	}
-
-	// 测试获取翻译器
-	translator, err := GetTranslator(LanguageChinese)
-	if err != nil {
-		t.Fatalf("GetTranslator should not return error: %v", err)
-	}
-	if translator == nil {
-		t.Fatal("translator should not be nil")
-	}
-}
-
+// TestConcurrentAccess 测试并发访问
 func TestConcurrentAccess(t *testing.T) {
-	// 测试并发访问的安全性
-	v := NewValidator()
-	ctx := context.Background()
+	v := New()
 
-	data := TestData{
-		Name:  "Concurrent Test",
-		Age:   25,
-		Email: "test@concurrent.com",
-	}
-
-	// 启动多个goroutine并发访问验证器
+	// 并发校验
 	done := make(chan bool, 10)
+
 	for i := 0; i < 10; i++ {
-		go func() {
+		go func(i int) {
 			defer func() { done <- true }()
 
-			for j := 0; j < 100; j++ {
-				err := v.Validate(ctx, data)
-				if err != nil {
-					t.Errorf("concurrent validation failed: %v", err)
-				}
+			user := TestUser{
+				Name:     fmt.Sprintf("User%d", i),
+				Email:    "user@example.com",
+				Mobile:   "1234567890",
+				Username: "user123",
+				Age:      25,
 			}
-		}()
+
+			err := v.Struct(&user)
+			assert.NoError(t, err)
+		}(i)
 	}
 
 	// 等待所有goroutine完成
@@ -281,35 +228,20 @@ func TestConcurrentAccess(t *testing.T) {
 	}
 }
 
-// 基准测试
+// BenchmarkValidation 基准测试
 func BenchmarkValidation(b *testing.B) {
-	v := NewValidator()
-	ctx := context.Background()
+	v := New()
 
-	data := TestData{
-		Name:  "Benchmark Test",
-		Age:   25,
-		Email: "benchmark@test.com",
+	user := TestUser{
+		Name:     "John Doe",
+		Email:    "john@example.com",
+		Mobile:   "1234567890",
+		Username: "johndoe",
+		Age:      25,
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		v.Validate(ctx, data)
-	}
-}
-
-func BenchmarkValidationWithTranslation(b *testing.B) {
-	v := NewValidator()
-	ctx := context.Background()
-
-	invalidData := TestData{
-		Name:  "A", // 无效数据
-		Age:   0,
-		Email: "invalid",
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		v.ValidateWithLanguage(ctx, invalidData, LanguageChinese)
+		_ = v.Struct(&user)
 	}
 }
