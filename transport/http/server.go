@@ -116,8 +116,9 @@ func additionalHandlers(s *Server) {
 func handleMetrics(s *Server, r *gin.Engine) {
 	if s.options.Metrics.Enabled {
 		prom := prometheus.NewPrometheus(prometheus.Config{
-			Path:               s.options.Metrics.Path,
-			EnabledGoCollector: true,
+			Path:                      s.options.Metrics.Path,
+			EnabledGoCollector:        s.options.Metrics.EnabledGoCollector,
+			EnabledBuildInfoCollector: s.options.Metrics.EnabledBuildInfoCollector,
 		})
 
 		r.GET(prom.Config.Path, gin.WrapH(promhttp.HandlerFor(prom.Registry, promhttp.HandlerOpts{

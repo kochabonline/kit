@@ -18,8 +18,10 @@ func (s *SwagOption) init() error {
 }
 
 type MetricsOption struct {
-	Enabled bool   `json:"enabled"`
-	Path    string `json:"path" default:"/metrics"`
+	Enabled                   bool   `json:"enabled"`
+	Path                      string `json:"path" default:"/metrics"`
+	EnabledGoCollector        bool   `json:"enabled_go_collector"`
+	EnabledBuildInfoCollector bool   `json:"enabled_build_info_collector"`
 }
 
 func (m *MetricsOption) init() error {

@@ -12,7 +12,7 @@ func TestNewURLBuilder(t *testing.T) {
 		Host("example.com").
 		Port("0").
 		Path("").
-		Query("key", "value").
+		Query("key", "value@example.com").
 		Fragment("section").
 		String()
 	t.Log("builder: ", builder)
