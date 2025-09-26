@@ -11,7 +11,7 @@ import (
 
 	"github.com/kochabonline/kit/log"
 	"github.com/kochabonline/kit/transport"
-	"github.com/kochabonline/kit/transport/http/metrics/prometheus"
+	"github.com/kochabonline/kit/transport/http/metrics"
 )
 
 var _ transport.Server = (*Server)(nil)
@@ -115,13 +115,14 @@ func additionalHandlers(s *Server) {
 
 func handleMetrics(s *Server, r *gin.Engine) {
 	if s.options.Metrics.Enabled {
-		prom := prometheus.NewPrometheus(prometheus.Config{
-			Path:                      s.options.Metrics.Path,
-			EnabledGoCollector:        s.options.Metrics.EnabledGoCollector,
-			EnabledBuildInfoCollector: s.options.Metrics.EnabledBuildInfoCollector,
-		})
+		if s.options.Metrics.EnabledGoCollector {
+			metrics.Prom.WithGoCollectorRuntimeMetrics()
+		}
+		if s.options.Metrics.EnabledBuildInfoCollector {
+			metrics.Prom.WithBuildInfoCollector()
+		}
 
-		r.GET(prom.Config.Path, gin.WrapH(promhttp.HandlerFor(prom.Registry, promhttp.HandlerOpts{
+		r.GET(s.options.Metrics.Path, gin.WrapH(promhttp.HandlerFor(metrics.Prom.Registry(), promhttp.HandlerOpts{
 			EnableOpenMetrics: true,
 		})))
 	}

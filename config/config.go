@@ -28,7 +28,7 @@ type Config struct {
 	provider Provider            // provider is the provider of the configuration, e.g., file, etc.
 	path     []string            // path is the path to the configuration file, can be multiple paths.
 	name     string              // name is the name of the configuration file without extension.
-	dest     any                 // dest is the destination where the configuration will be unmarshalled.
+	target   any                 // target is the destination where the configuration will be unmarshalled.
 }
 
 type Option func(*Config)
@@ -63,9 +63,9 @@ func WithName(name string) Option {
 	}
 }
 
-func WithDest(dest any) Option {
+func WithTarget(target any) Option {
 	return func(c *Config) {
-		c.dest = dest
+		c.target = target
 	}
 }
 
@@ -112,15 +112,15 @@ func (c *Config) ReadInConfig() error {
 		return err
 	}
 
-	if err := c.viper.Unmarshal(&c.dest); err != nil {
+	if err := c.viper.Unmarshal(&c.target); err != nil {
 		return err
 	}
 
-	if err := reflect.SetDefaultTag(c.dest); err != nil {
+	if err := reflect.SetDefaultTag(c.target); err != nil {
 		return err
 	}
 
-	if err := c.validate.Struct(c.dest); err != nil {
+	if err := c.validate.Struct(c.target); err != nil {
 		return err
 	}
 
@@ -129,7 +129,7 @@ func (c *Config) ReadInConfig() error {
 
 func (c *Config) WatchConfig() error {
 	c.viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Info().Msgf("config file changed: %s", e.Name)
+		log.Info().Str("name", e.Name).Str("event", e.Op.String()).Msg("config file changed")
 		if err := c.ReadInConfig(); err != nil {
 			log.Error().Err(err).Msg("failed to reload config")
 		}

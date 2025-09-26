@@ -26,8 +26,8 @@ type mock struct {
 func TestConfig(t *testing.T) {
 	cfg := new(mock)
 	cfg.Port = 9090
-	cfg.Host = "1"
-	c := New(WithDest(cfg))
+	cfg.Host = "12"
+	c := New(WithTarget(cfg))
 
 	if err := c.ReadInConfig(); err != nil {
 		t.Fatal(err)
