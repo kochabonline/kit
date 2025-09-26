@@ -4,23 +4,27 @@ import (
 	"testing"
 )
 
+type api struct {
+	Name    string            `json:"name"`
+	Method  string            `json:"method" default:"GET"`
+	Url     string            `json:"url"`
+	Body    string            `json:"body"`
+	Headers map[string]string `json:"headers"`
+	Timeout int               `json:"timeout" default:"3"`
+	Period  int               `json:"period" default:"10"`
+}
+
+type server struct {
+	Host string `json:"host" default:"localhost"`
+}
+
 type mock struct {
 	Host    string  `json:"host" validate:"required,min=2,max=10"`
 	Port    int     `json:"port" default:"8080"`
-	Number  float64 `json:"number"`
+	Number  float64 `json:"number" default:"1.23"`
 	Enabled bool    `json:"enabled" default:"true"`
-	Mock1   struct {
-		Host string `json:"host" default:"localhost"`
-	} `json:"mock1"`
-	Apis []struct {
-		Name    string            `json:"name"`
-		Method  string            `json:"method" default:"GET"`
-		Url     string            `json:"url"`
-		Body    string            `json:"body"`
-		Headers map[string]string `json:"headers"`
-		Timeout int               `json:"timeout" default:"3"`
-		Period  int               `json:"period" default:"10"`
-	} `json:"apis"`
+	Server  server  `json:"server"`
+	Apis    []api   `json:"apis"`
 }
 
 func TestConfig(t *testing.T) {
