@@ -24,10 +24,6 @@ const (
 	RotateModeSize
 )
 
-var (
-	DefaultLogger *Logger
-)
-
 type Config struct {
 	RotateMode       RotateMode
 	Filepath         string `default:"log"`
@@ -56,6 +52,13 @@ type Logger struct {
 
 type Option func(*Logger)
 
+// WithLevel 设置日志级别
+func WithLevel(level zerolog.Level) Option {
+	return func(l *Logger) {
+		l.Logger = l.Logger.Level(level)
+	}
+}
+
 // WithCaller 设置调用栈信息
 func WithCaller() Option {
 	return func(l *Logger) {
@@ -82,16 +85,15 @@ func (l *Logger) GetDesensitizeHook() *DesensitizeHook {
 	return l.desensitizeHook
 }
 
-// SetGlobalLevel 设置全局日志级别
-func SetGlobalLevel(level zerolog.Level) {
-	zerolog.SetGlobalLevel(level)
-}
-
 func init() {
 	// 初始化全局日志配置
 	zerolog.TimeFieldFormat = time.DateTime
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-	DefaultLogger = New()
+}
+
+// SetZerologGlobalLevel 设置全局日志级别
+func SetZerologGlobalLevel(level zerolog.Level) {
+	zerolog.SetGlobalLevel(level)
 }
 
 // newFallbackWriter 创建一个回退的日志writer
