@@ -16,11 +16,10 @@ type api struct {
 
 type server struct {
 	Host string `json:"host" default:"localhost"`
+	Port int    `json:"port" default:"80"`
 }
 
 type mock struct {
-	Host    string  `json:"host" validate:"required,min=2,max=10"`
-	Port    int     `json:"port" default:"8080"`
 	Number  float64 `json:"number" default:"1.23"`
 	Enabled bool    `json:"enabled" default:"true"`
 	Server  server  `json:"server"`
@@ -29,8 +28,6 @@ type mock struct {
 
 func TestConfig(t *testing.T) {
 	cfg := new(mock)
-	cfg.Port = 9090
-	cfg.Host = "12"
 	c := New(WithTarget(cfg))
 
 	if err := c.ReadInConfig(); err != nil {

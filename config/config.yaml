@@ -8,3 +8,6 @@ apis:
     url: "https://api.example.com/user"
     headers:
       Authorization: "Bearer token"
+
+server:
+  host: "example.com"

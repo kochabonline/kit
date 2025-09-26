@@ -108,6 +108,10 @@ func (c *Config) GetViper() *viper.Viper {
 }
 
 func (c *Config) ReadInConfig() error {
+	if err := reflect.SetDefaultTag(c.target); err != nil {
+		return err
+	}
+
 	if err := c.viper.ReadInConfig(); err != nil {
 		return err
 	}
