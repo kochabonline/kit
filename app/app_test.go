@@ -221,21 +221,6 @@ func TestCloseFunc_Timeout(t *testing.T) {
 	}
 }
 
-func TestDefaultValues(t *testing.T) {
-	if DefaultShutdownTimeout != 30*time.Second {
-		t.Fatalf("unexpected default shutdown timeout: %v", DefaultShutdownTimeout)
-	}
-
-	if DefaultCloseTimeout != 30*time.Second {
-		t.Fatalf("unexpected default close timeout: %v", DefaultCloseTimeout)
-	}
-
-	expectedSignals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
-	if len(DefaultSignals) != len(expectedSignals) {
-		t.Fatalf("unexpected number of default signals: %d", len(DefaultSignals))
-	}
-}
-
 func TestWithNilOptions(t *testing.T) {
 	// Test that nil values are handled gracefully
 	app := New(

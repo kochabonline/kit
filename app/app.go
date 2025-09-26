@@ -16,31 +16,10 @@ import (
 	"github.com/kochabonline/kit/transport"
 )
 
-// 默认配置值
-const (
-	DefaultShutdownTimeout = 30 * time.Second
-	DefaultCloseTimeout    = 30 * time.Second
-)
-
-// 默认关闭信号
-var DefaultSignals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
-
 var (
 	ErrAlreadyStarted = errors.New("application already started")
 	ErrClosePanic     = errors.New("close function panicked")
 )
-
-// Option 定义 Application 的配置选项
-type Option interface {
-	apply(*Application)
-}
-
-// optionFunc 包装函数以实现 Option 接口
-type optionFunc func(*Application)
-
-func (f optionFunc) apply(app *Application) {
-	f(app)
-}
 
 // Application 管理服务器和关闭函数的生命周期
 type Application struct {
@@ -62,90 +41,68 @@ type CloseFunc struct {
 	Timeout time.Duration
 }
 
-// NewApplication 使用给定选项创建新的应用实例
-func New(options ...Option) *Application {
-	app := &Application{
-		shutdownTimeout: DefaultShutdownTimeout,
-		closeTimeout:    DefaultCloseTimeout,
-		signals:         make([]os.Signal, len(DefaultSignals)),
-		servers:         make([]transport.Server, 0),
-		closeFuncs:      make([]CloseFunc, 0),
-	}
-
-	// 复制默认信号
-	copy(app.signals, DefaultSignals)
-
-	// 设置默认上下文
-	app.ctx, app.cancel = context.WithCancel(context.Background())
-
-	// 应用选项
-	for _, opt := range options {
-		opt.apply(app)
-	}
-
-	return app
-}
+type Option func(*Application)
 
 // WithContext 设置应用的根上下文
 func WithContext(ctx context.Context) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		if ctx != nil {
 			app.ctx, app.cancel = context.WithCancel(ctx)
 		}
-	})
+	}
 }
 
 // WithShutdownTimeout 设置服务器关闭的超时时间
 func WithShutdownTimeout(timeout time.Duration) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		if timeout > 0 {
 			app.shutdownTimeout = timeout
 		}
-	})
+	}
 }
 
 // WithCloseTimeout 设置关闭函数的默认超时时间
 func WithCloseTimeout(timeout time.Duration) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		if timeout > 0 {
 			app.closeTimeout = timeout
 		}
-	})
+	}
 }
 
 // WithSignals 设置用于优雅关闭的自定义信号
 func WithSignals(signals ...os.Signal) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		if len(signals) > 0 {
 			app.signals = make([]os.Signal, len(signals))
 			copy(app.signals, signals)
 		}
-	})
+	}
 }
 
 // WithServer 向应用添加服务器
 func WithServer(server transport.Server) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		if server != nil {
 			app.servers = append(app.servers, server)
 		}
-	})
+	}
 }
 
 // WithServers 向应用添加多个服务器
 func WithServers(servers ...transport.Server) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		for _, server := range servers {
 			if server != nil {
 				app.servers = append(app.servers, server)
 			}
 		}
-	})
+	}
 }
 
 // WithClose 添加在关闭期间执行的关闭函数
 func WithClose(name string, fn func(context.Context) error, timeout time.Duration) Option {
-	return optionFunc(func(app *Application) {
+	return func(app *Application) {
 		if fn == nil {
 			log.Warn().Str("name", name).Msg("nil close function ignored")
 			return
@@ -162,7 +119,82 @@ func WithClose(name string, fn func(context.Context) error, timeout time.Duratio
 		}
 
 		app.closeFuncs = append(app.closeFuncs, close)
-	})
+	}
+}
+
+// WithServerHealthCheck 添加具有健康检查功能的服务器
+func WithServerHealthCheck(server transport.Server, healthCheck func() error) Option {
+	return func(app *Application) {
+		if server != nil {
+			app.servers = append(app.servers, server)
+
+			// 添加健康检查作为关闭函数
+			if healthCheck != nil {
+				app.closeFuncs = append(app.closeFuncs, CloseFunc{
+					Name: "health-check",
+					Fn: func(ctx context.Context) error {
+						return healthCheck()
+					},
+					Timeout: 5 * time.Second,
+				})
+			}
+		}
+	}
+}
+
+// WithGracefulShutdown 启用具有自定义预关闭钩子的优雅关闭
+func WithGracefulShutdown(preShutdownHook func() error) Option {
+	return func(app *Application) {
+		if preShutdownHook != nil {
+			app.closeFuncs = append(app.closeFuncs, CloseFunc{
+				Name: "pre-shutdown-hook",
+				Fn: func(ctx context.Context) error {
+					return preShutdownHook()
+				},
+				Timeout: app.closeTimeout,
+			})
+		}
+	}
+}
+
+// WithStartupValidation 添加在服务器启动前运行的验证
+func WithStartupValidation(validator func() error) Option {
+	return func(app *Application) {
+		if validator != nil {
+			// 添加验证作为特殊的关闭函数，优先运行
+			validation := CloseFunc{
+				Name: "startup-validation",
+				Fn: func(ctx context.Context) error {
+					return validator()
+				},
+				Timeout: 30 * time.Second,
+			}
+
+			// 插入到开头
+			app.closeFuncs = append([]CloseFunc{validation}, app.closeFuncs...)
+		}
+	}
+}
+
+// New 使用给定选项创建新的应用实例
+func New(options ...Option) *Application {
+	app := &Application{
+		shutdownTimeout: 30 * time.Second,
+		closeTimeout:    30 * time.Second,
+		signals:         []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT},
+		servers:         make([]transport.Server, 0),
+		closeFuncs:      make([]CloseFunc, 0),
+	}
+
+	// 设置默认上下文
+	app.ctx, app.cancel = context.WithCancel(context.Background())
+
+	// 应用选项
+	for _, opt := range options {
+		opt(app)
+	}
+
+	return app
 }
 
 // AddServer 在运行时向应用添加服务器
@@ -388,58 +420,4 @@ type ApplicationInfo struct {
 	Started     bool `json:"started"`
 	ServerCount int  `json:"server_count"`
 	CloseCount  int  `json:"close_count"`
-}
-
-// WithServerHealthCheck 添加具有健康检查功能的服务器
-func WithServerHealthCheck(server transport.Server, healthCheck func() error) Option {
-	return optionFunc(func(app *Application) {
-		if server != nil {
-			app.servers = append(app.servers, server)
-
-			// 添加健康检查作为关闭函数
-			if healthCheck != nil {
-				app.closeFuncs = append(app.closeFuncs, CloseFunc{
-					Name: "health-check",
-					Fn: func(ctx context.Context) error {
-						return healthCheck()
-					},
-					Timeout: 5 * time.Second,
-				})
-			}
-		}
-	})
-}
-
-// WithGracefulShutdown 启用具有自定义预关闭钩子的优雅关闭
-func WithGracefulShutdown(preShutdownHook func() error) Option {
-	return optionFunc(func(app *Application) {
-		if preShutdownHook != nil {
-			app.closeFuncs = append(app.closeFuncs, CloseFunc{
-				Name: "pre-shutdown-hook",
-				Fn: func(ctx context.Context) error {
-					return preShutdownHook()
-				},
-				Timeout: app.closeTimeout,
-			})
-		}
-	})
-}
-
-// WithStartupValidation 添加在服务器启动前运行的验证
-func WithStartupValidation(validator func() error) Option {
-	return optionFunc(func(app *Application) {
-		if validator != nil {
-			// 添加验证作为特殊的关闭函数，优先运行
-			validation := CloseFunc{
-				Name: "startup-validation",
-				Fn: func(ctx context.Context) error {
-					return validator()
-				},
-				Timeout: 30 * time.Second,
-			}
-
-			// 插入到开头
-			app.closeFuncs = append([]CloseFunc{validation}, app.closeFuncs...)
-		}
-	})
 }
